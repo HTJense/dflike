@@ -1,0 +1,83 @@
+import numpy as np
+from functools import partial
+import jax
+import jax.numpy as jnp
+
+
+@jax.jit
+def _bp_int(nu, f, bp):
+    return jnp.trapezoid(f * bp, nu)
+
+
+class CrossProductModel:
+    """
+       C_ell^(nu1xnu2) = A * C_ell * f(nu1) * f(nu2)
+    """
+    def __init__(self, power, sed):
+        self.power = power
+        self.sed = sed
+
+    @partial(jax.jit, static_argnums=(0,))
+    def __call__(self, power_params, sed):
+        cl = self.power(**power_params)
+
+        nus = sed.pop("nu")
+        bps = sed.pop("bp")
+
+        f_nus = jnp.zeros((len(nus),))
+        for i, (nu, bp) in enumerate(zip(nus, bps)):
+            f_nu = self.sed(nu=nu, **sed)
+            f_nus = f_nus.at[i].set(_bp_int(nu, f_nu, bp))
+
+        return jnp.einsum("...i,...j,...l->...ijl", cl, f_nus, f_nus)
+
+
+class CorrelatedCrossProductModel:
+    """
+        For two components, A and B, which are correlated:
+        C_ell^(nu1xnu2) =
+            a_A * C_ell^A f^A(nu1) f^A(nu2)
+            + a_B * C_ell^B f^B(nu1) f^B(nu2)
+            + a_(AxB) C_ell^(AxB) (f^A(nu1) f^B(nu2) + f^A(nu2) f^B(nu1)
+    """
+    def __init__(self, power1, power2, powerx, sed1, sed2):
+        self.power1 = power1
+        self.power2 = power2
+        self.powerx = powerx
+        self.sed1 = sed1
+        self.sed2 = sed2
+
+    @partial(jax.jit, static_argnums=(0,))
+    def __call__(self, power1_params, power2_params, powerx_params, sed1_params, sed2_params):
+        cl1 = self.power1(**power1_params)
+        cl2 = self.power2(**power2_params)
+        clx = self.powerx(**powerx_params)
+
+        nus1 = sed1_params.pop("nu")
+        bps1 = sed1_params.pop("bp")
+
+        f_nus1 = jnp.zeros((len(nus1),))
+        for i, (nu1, bp1) in enumerate(zip(nus1, bps1)):
+            f_nu = self.sed1(nu=nu1, **sed1_params)
+            f_nus1 = f_nus1.at[i].set(_bp_int(nu1, f_nu, bp1))
+
+        nus2 = sed2_params.pop("nu")
+        bps2 = sed2_params.pop("bp")
+
+        f_nus2 = jnp.zeros((len(nus2),))
+        for i, (nu2, bp2) in enumerate(zip(nus2, bps2)):
+            f_nu = self.sed2(nu=nu2, **sed2_params)
+            f_nus2 = f_nus2.at[i].set(_bp_int(nu2, f_nu, bp2))
+
+        comp1 = jnp.einsum("...i,...j,...l->...ijl", cl1, f_nus1, f_nus1)
+        comp2 = jnp.einsum("...i,...j,...l->...ijl", cl2, f_nus2, f_nus2)
+
+        clx = jnp.broadcast_to(clx[:,None,None], comp1.shape)
+        f_nus11 = jnp.broadcast_to(f_nus1[None,:,None], comp1.shape)
+        f_nus12 = jnp.broadcast_to(f_nus1[None,None,:], comp1.shape)
+        f_nus21 = jnp.broadcast_to(f_nus2[None,:,None], comp2.shape)
+        f_nus22 = jnp.broadcast_to(f_nus2[None,None,:], comp2.shape)
+
+        compx = clx * (f_nus11 * f_nus22 + f_nus21 * f_nus12)
+        return comp1 + comp2 + compx
+
