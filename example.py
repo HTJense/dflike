@@ -163,7 +163,7 @@ hess = jax.hessian(logpost)
 # derivatives:
 H = hess(theta)
 cov = jnp.linalg.inv(H)
-err = np.sqrt(np.diag(F))
+err = np.sqrt(np.diag(cov))
 
 for i, par in enumerate(free_params):
 	print(f"{par}: {theta[i]:.2f} +/- {err[i]:.2f}")
