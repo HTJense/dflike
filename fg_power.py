@@ -29,7 +29,7 @@ class PoissonCl:
         self.ell0 = ell0
         self.elp0 = ell0 * (ell0 + 1.)
 
-    @partial(jax.jit, static_argnums=(0,))
+    #@partial(jax.jit, static_argnums=(0,))
     def __call__(self, ell, amp=1., alpha=0.0):
         ls = jnp.where(ell <= 0, 1, ell)
         elp = ls * (ls + 1.)

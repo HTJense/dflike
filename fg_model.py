@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 
 
-@jax.jit
 def _bp_int(nu, f, bp):
     return jnp.trapezoid(f * bp, nu)
 
@@ -21,12 +20,13 @@ class CrossProductModel:
     def __call__(self, power_params, sed):
         cl = self.power(**power_params)
 
-        nus = sed.pop("nu")
-        bps = sed.pop("bp")
+        nus = sed["nu"]
+        bps = sed["bp"]
+        sed_args = {k: v for k, v in sed.items() if k not in ("nu", "bp")}
 
         f_nus = jnp.zeros((len(nus),))
         for i, (nu, bp) in enumerate(zip(nus, bps)):
-            f_nu = self.sed(nu=nu, **sed)
+            f_nu = self.sed(nu=nu, **sed_args)
             f_nus = f_nus.at[i].set(_bp_int(nu, f_nu, bp))
 
         return jnp.einsum("...i,...j,...l->...ijl", cl, f_nus, f_nus)
@@ -53,20 +53,22 @@ class CorrelatedCrossProductModel:
         cl2 = self.power2(**power2_params)
         clx = self.powerx(**powerx_params)
 
-        nus1 = sed1_params.pop("nu")
-        bps1 = sed1_params.pop("bp")
+        nus1 = sed1_params["nu"]
+        bps1 = sed1_params["bp"]
+        sed1_args = {k: v for k, v in sed1_params.items() if k not in ("nu", "bp")}
 
         f_nus1 = jnp.zeros((len(nus1),))
         for i, (nu1, bp1) in enumerate(zip(nus1, bps1)):
-            f_nu = self.sed1(nu=nu1, **sed1_params)
+            f_nu = self.sed1(nu=nu1, **sed1_args)
             f_nus1 = f_nus1.at[i].set(_bp_int(nu1, f_nu, bp1))
 
-        nus2 = sed2_params.pop("nu")
-        bps2 = sed2_params.pop("bp")
+        nus2 = sed2_params["nu"]
+        bps2 = sed2_params["bp"]
+        sed2_args = {k: v for k, v in sed2_params.items() if k not in ("nu", "bp")}
 
         f_nus2 = jnp.zeros((len(nus2),))
         for i, (nu2, bp2) in enumerate(zip(nus2, bps2)):
-            f_nu = self.sed2(nu=nu2, **sed2_params)
+            f_nu = self.sed2(nu=nu2, **sed2_args)
             f_nus2 = f_nus2.at[i].set(_bp_int(nu2, f_nu, bp2))
 
         comp1 = jnp.einsum("...i,...j,...l->...ijl", cl1, f_nus1, f_nus1)

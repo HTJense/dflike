@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from scipy import constants
 
 
-T_CMB = 2.7255
+T_CMB = 2.72548
 
 
 @jax.jit

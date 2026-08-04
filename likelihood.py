@@ -28,6 +28,11 @@ class MFLike_jax:
         self.ells = jnp.arange(2, defaults["lmax"]+1)
         i0 = 0
 
+        self.parameters = ["calG_all"]
+        for exp in self.experiments:
+            self.parameters.append(f"cal_{exp}")
+            self.parameters.append(f"calE_{exp}")
+
         for entry in self.config["data"]["spectra"]:
             ex1, ex2 = entry["experiments"]
             for xy in entry.get("polarizations", defaults["polarizations"]):
@@ -42,11 +47,13 @@ class MFLike_jax:
                 data_vec += list(cl[m])
                 bpw = s.get_bandpower_windows(ind)
 
+                x1, x2 = ((ex2, ex1) if xy == "ET" else (ex1, ex2))
+
                 self.spec_meta.append({
                     "dt": dt,
-                    "exp1": ex1,
-                    "exp2": ex2,
-                    "ix": (self.experiments.index(ex1), self.experiments.index(ex2)),
+                    "exp1": x1,
+                    "exp2": x2,
+                    "ix": (self.experiments.index(x1), self.experiments.index(x2)),
                     "lmin": lmin,
                     "lmax": lmax,
                     "ids": i0 + np.arange(len(ind[m])),
@@ -57,11 +64,11 @@ class MFLike_jax:
                 })
                 i0 += len(ind[m])
 
-        self.data_vec = np.array(data_vec)
+        self.data_vec = jnp.asarray(data_vec)
         data_indices = np.array(data_indices)
 
         self.covmat = s.covariance.covmat[data_indices,:][:,data_indices]
-        self.inv_cov = np.linalg.inv(self.covmat)
+        self.inv_cov = jnp.asarray(np.linalg.inv(self.covmat))
 
     @partial(jax.jit, static_argnums=(0,))
     def bin_spectra(self, spec):
@@ -98,7 +105,6 @@ class MFLike_jax:
     def get_unbinned_model(self, dltt, dlte, dlee, foregrounds, **params):
         """Project (TT,TE,EE) from (3, ell) to (3, ell, exp1, exp2) and add foregrounds."""
         spec = jnp.stack([ dltt[self.ells], dlte[self.ells], dlee[self.ells] ])
-        foregrounds = foregrounds[:,self.ells,:,:]
         spec = jnp.broadcast_to(spec[:,:,None,None], foregrounds.shape) + foregrounds
 
         return self.calibrate_spectra(spec, **params)
