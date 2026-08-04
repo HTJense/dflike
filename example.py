@@ -131,8 +131,8 @@ def logprior(theta):
 @jax.jit
 def loglike(theta):
     theta_like = theta[:len(like.parameters)]
-    params = { k: theta[i] for i, k in enumerate(free_params) } | fixed_params
-    foregrounds = fg_model.get_foreground_model(**params)
+    theta_fg = theta[len(like.parameters):]
+    foregrounds = fg_model.get_foreground_model(theta_fg)
     logl = -0.5 * like.chisquare(spec[:,0], spec[:,3], spec[:,1], foregrounds, theta_like)
     return -logl
 
