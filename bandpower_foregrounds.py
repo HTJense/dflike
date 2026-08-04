@@ -41,6 +41,16 @@ class BandpowerForegrounds:
         self.bpT = [ jnp.array(likelihood.tracers[exp + "_s0"]["bp"] / np.trapezoid(likelihood.tracers[exp + "_s0"]["bp"], likelihood.tracers[exp + "_s0"]["nu"])) for exp in self.experiments ]
         self.bpP = [ jnp.array(likelihood.tracers[exp + "_s2"]["bp"] / np.trapezoid(likelihood.tracers[exp + "_s2"]["bp"], likelihood.tracers[exp + "_s2"]["nu"])) for exp in self.experiments ]
 
+        self.parameters = [
+            "a_tSZ", "alpha_tSZ", "a_kSZ",
+            "xi", "a_c", "beta_c", "a_p", "beta_p",
+            "a_s", "beta_s",
+            "a_gtt", "a_gte", "a_gee",
+            "a_pste", "a_psee",
+        ]
+        for exp in self.experiments:
+            self.parameters.append(f"bandint_shift_{exp}")
+
     @partial(jax.jit, static_argnums=(0,))
     def apply_bandpass_shifts(self, **params):
         nus = []

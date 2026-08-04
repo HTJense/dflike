@@ -84,17 +84,7 @@ sys_params = {
 
 params = fg_params | sys_params
 
-free_params = [
-	"a_tSZ", "alpha_tSZ", "a_kSZ",
-	"xi", "a_c", "beta_c", "a_p", "beta_p",
-	"a_s", "beta_s",
-	"a_gtt", "a_gte", "a_gee",
-	"a_pste", "a_psee",
-	"calG_all",
-	"cal_dr6_pa4_f220", "cal_dr6_pa5_f090", "cal_dr6_pa5_f150", "cal_dr6_pa6_f090", "cal_dr6_pa6_f150",
-	"calE_dr6_pa5_f090", "calE_dr6_pa5_f150", "calE_dr6_pa6_f090", "calE_dr6_pa6_f150",
-	"bandint_shift_dr6_pa4_f220", "bandint_shift_dr6_pa5_f090", "bandint_shift_dr6_pa5_f150", "bandint_shift_dr6_pa6_f090", "bandint_shift_dr6_pa6_f150",
-]
+free_params = like.parameters + fg_model.parameters
 
 priors = {
     "calG_all": lambda x: jsc.stats.norm.logpdf(x, loc=1.0, scale=0.003),
@@ -140,9 +130,10 @@ def logprior(theta):
 
 @jax.jit
 def loglike(theta):
+    theta_like = theta[:len(like.parameters)]
     params = { k: theta[i] for i, k in enumerate(free_params) } | fixed_params
     foregrounds = fg_model.get_foreground_model(**params)
-    logl = -0.5 * like.chisquare(spec[:,0], spec[:,3], spec[:,1], foregrounds, **params)
+    logl = -0.5 * like.chisquare(spec[:,0], spec[:,3], spec[:,1], foregrounds, theta_like)
     return -logl
 
 @jax.jit
@@ -166,4 +157,5 @@ cov = jnp.linalg.inv(H)
 err = np.sqrt(np.diag(cov))
 
 for i, par in enumerate(free_params):
-	print(f"{par}: {theta[i]:.2f} +/- {err[i]:.2f}")
+    print(f"{par}: {theta[i]:.2f} +/- {err[i]:.2f}")
+

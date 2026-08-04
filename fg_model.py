@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 
 
+@jax.jit
 def _bp_int(nu, f, bp):
     return jnp.trapezoid(f * bp, nu)
 

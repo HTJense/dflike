@@ -33,6 +33,9 @@ class MFLike_jax:
             self.parameters.append(f"cal_{exp}")
             self.parameters.append(f"calE_{exp}")
 
+        self.calT_index = jnp.array([ self.parameters.index(f"cal_{exp}") for exp in self.experiments ])
+        self.calE_index = jnp.array([ self.parameters.index(f"calE_{exp}") for exp in self.experiments ])
+
         for entry in self.config["data"]["spectra"]:
             ex1, ex2 = entry["experiments"]
             for xy in entry.get("polarizations", defaults["polarizations"]):
@@ -86,32 +89,36 @@ class MFLike_jax:
         return model_vec
 
     @partial(jax.jit, static_argnums=(0,))
-    def calibrate_spectra(self, spectra, **params):
+    def calibrate_spectra(self, spectra, theta):
         """ spectra is a (3, ell, exp1, exp2) array """
         """ for each pair of (exp1, exp2), we divide the entry by """
         """ (cal_exp1 * cal_exp2, cal_exp1 * cal_exp2 * calE_exp2, cal_exp1 * calE_exp1 * cal_exp2 * calE_exp2 """
-        calib_spec = jnp.zeros_like(spectra)
-        calG = 1. / params["calG_all"] ** 2.
+        """ Refer to the `parameters` array to find the parameter names. """
+        calG = 1. / theta[0] ** 2.
+        calT = 1. / theta[self.calT_index]
+        calE = 1. / (theta[self.calT_index] * theta[self.calE_index])
 
-        for i, exp1 in enumerate(self.experiments):
-            for j, exp2 in enumerate(self.experiments):
-                calib_spec = calib_spec.at[0,:,i,j].set( spectra[0,:,i,j] * calG / (params[f"cal_{exp1}"] * params[f"cal_{exp2}"]) )
-                calib_spec = calib_spec.at[1,:,i,j].set( spectra[1,:,i,j] * calG / (params[f"cal_{exp1}"] * params[f"cal_{exp2}"] * params[f"calE_{exp2}"]) )
-                calib_spec = calib_spec.at[2,:,i,j].set( spectra[2,:,i,j] * calG / (params[f"cal_{exp1}"] * params[f"calE_{exp1}"] * params[f"cal_{exp2}"] * params[f"calE_{exp2}"]) )
+        calTT = calT[:,None] * calT[None,:]
+        calTE = calT[:,None] * calE[None,:]
+        calEE = calE[:,None] * calE[None,:]
 
-        return calib_spec
+        return jnp.stack([
+            spectra[0] * calG * calTT,
+            spectra[1] * calG * calTE,
+            spectra[2] * calG * calEE,
+        ])
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_unbinned_model(self, dltt, dlte, dlee, foregrounds, **params):
+    def get_unbinned_model(self, dltt, dlte, dlee, foregrounds, theta):
         """Project (TT,TE,EE) from (3, ell) to (3, ell, exp1, exp2) and add foregrounds."""
         spec = jnp.stack([ dltt[self.ells], dlte[self.ells], dlee[self.ells] ])
         spec = jnp.broadcast_to(spec[:,:,None,None], foregrounds.shape) + foregrounds
 
-        return self.calibrate_spectra(spec, **params)
+        return self.calibrate_spectra(spec, theta)
 
     @partial(jax.jit, static_argnums=(0,))
-    def chisquare(self, dltt, dlte, dlee, foregrounds, **params):
-        spec = self.get_unbinned_model(dltt, dlte, dlee, foregrounds, **params)
+    def chisquare(self, dltt, dlte, dlee, foregrounds, theta):
+        spec = self.get_unbinned_model(dltt, dlte, dlee, foregrounds, theta)
         binned_spec = self.bin_spectra(spec)
         delta = self.data_vec - binned_spec
         chi2 = delta @ self.inv_cov @ delta
