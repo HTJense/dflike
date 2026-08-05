@@ -55,7 +55,7 @@ class TemplateCl:
     """
     def __init__(self, filename, ell_0=3000, **kwargs):
         assert ell_0 > 0, "ell_0 must be positive."
-        filepath = os.path.join(os.path.dirname(__file__), filename)
+        filepath = os.path.join(os.path.dirname(__file__), "data", filename)
         ls, cl = np.loadtxt(filepath, unpack=True)
         ls = ls.astype(int)
         template_cl = np.zeros(ls.max() + 1)

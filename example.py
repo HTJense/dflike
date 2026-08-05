@@ -2,8 +2,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsc
-from likelihood import MFLike_jax
-from bandpower_foregrounds import BandpowerForegrounds
+from mflike_jax import MFLike_jax, BandpowerForegrounds
 import camb
 
 """ One could use Cosmopower-JAX here for cosmology, but I'll keep cosmology
@@ -82,7 +81,40 @@ sys_params = {
     "bandint_shift_dr6_pa6_f150": 0.0,
 }
 
-params = fg_params | sys_params
+deriv_params = [
+    "a_tSZ",
+    "alpha_tSZ",
+    "a_kSZ",
+    "a_c",
+    "a_p",
+    "beta_p",
+    "beta_c",
+    "xi",
+    "a_s",
+    "beta_s",
+    "a_pste",
+    "a_psee",
+    "a_gtt",
+    "a_gte",
+    "a_gee",
+    "calG_all",
+    "cal_dr6_pa4_f220",
+    "cal_dr6_pa5_f090",
+    "cal_dr6_pa5_f150",
+    "cal_dr6_pa6_f090",
+    "cal_dr6_pa6_f150",
+    "calE_dr6_pa5_f090",
+    "calE_dr6_pa5_f150",
+    "calE_dr6_pa6_f090",
+    "calE_dr6_pa6_f150",
+    "bandint_shift_dr6_pa4_f220",
+    "bandint_shift_dr6_pa5_f090",
+    "bandint_shift_dr6_pa5_f150",
+    "bandint_shift_dr6_pa6_f090",
+    "bandint_shift_dr6_pa6_f150",
+]
+
+params_values = fg_params | sys_params
 
 free_params = like.parameters + fg_model.parameters
 
@@ -110,10 +142,10 @@ priors = {
     turn our dictionary into a vector (and then turn it back later, don't
     think too hard about it). """
 
-theta = jnp.array([ params[k] for k in free_params ])
+theta = jnp.array([ params_values[k] for k in free_params ])
 
 fixed_params = {
-    k : params[k] for k in params if k not in free_params
+    k : params_values[k] for k in params_values if k not in free_params
 }
 
 """ Define our log-likelihood and log-prior functions. Note that these are
@@ -152,11 +184,15 @@ hess = jax.hessian(logpost)
 
 # These two are functions, we can evaluate them at the same values and find
 # derivatives:
-dL = grad(theta)
 H = hess(theta)
+
+# We need to take out only the entries of the Hessian that we care about.
+idx = jnp.array([ free_params.index(p) for p in deriv_params ])
+H = H[:,idx][idx,:]
+
 cov = jnp.linalg.inv(H)
 err = np.sqrt(np.diag(cov))
 
-for i, par in enumerate(free_params):
-    print(f"{par:>30s} = {theta[i]:8.2f} +/- {err[i]:5.2f} | dL/d{par:<30s} = {dL[i]:8.2f}")
+for i, par in enumerate(deriv_params):
+    print(f"{par:>30s} = {params_values[par]:8.2f} +/- " + (f"{err[i]:4.2e}" if err[i] < 0.01 else f"{err[i]:4.2f}"))
 

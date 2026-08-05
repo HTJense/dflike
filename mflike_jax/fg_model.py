@@ -40,7 +40,7 @@ class CorrelatedCrossProductModel:
         C_ell^(nu1xnu2) =
             a_A * C_ell^A f^A(nu1) f^A(nu2)
             + a_B * C_ell^B f^B(nu1) f^B(nu2)
-            + a_(AxB) C_ell^(AxB) (f^A(nu1) f^B(nu2) + f^A(nu2) f^B(nu1)
+            - a_(AxB) sqrt(a_A a_B) C_ell^(AxB) (f^A(nu1) f^B(nu2) + f^A(nu2) f^B(nu1)
     """
     def __init__(self, power1, power2, powerx, sed1, sed2):
         self.power1 = power1
@@ -80,41 +80,6 @@ class CorrelatedCrossProductModel:
         compx = clx[:,None,None] * jnp.sqrt(self.power1.amp(theta_cl1) * self.power2.amp(theta_cl2)) * (f_nus1[None,:,None] * f_nus2[None,None,:] + f_nus1[None,None,:] * f_nus2[None,:,None])
 
         return comp1 + comp2 - compx
-        """
-        cl1 = self.power1(**power1_params)
-        cl2 = self.power2(**power2_params)
-        clx = self.powerx(**powerx_params)
-
-        nus1 = sed1_params["nu"]
-        bps1 = sed1_params["bp"]
-        sed1_args = {k: v for k, v in sed1_params.items() if k not in ("nu", "bp")}
-
-        f_nus1 = jnp.zeros((len(nus1),))
-        for i, (nu1, bp1) in enumerate(zip(nus1, bps1)):
-            f_nu = self.sed1(nu=nu1, **sed1_args)
-            f_nus1 = f_nus1.at[i].set(_bp_int(nu1, f_nu, bp1))
-
-        nus2 = sed2_params["nu"]
-        bps2 = sed2_params["bp"]
-        sed2_args = {k: v for k, v in sed2_params.items() if k not in ("nu", "bp")}
-
-        f_nus2 = jnp.zeros((len(nus2),))
-        for i, (nu2, bp2) in enumerate(zip(nus2, bps2)):
-            f_nu = self.sed2(nu=nu2, **sed2_args)
-            f_nus2 = f_nus2.at[i].set(_bp_int(nu2, f_nu, bp2))
-
-        comp1 = jnp.einsum("...i,...j,...l->...ijl", cl1, f_nus1, f_nus1)
-        comp2 = jnp.einsum("...i,...j,...l->...ijl", cl2, f_nus2, f_nus2)
-
-        clx = jnp.broadcast_to(clx[:,None,None], comp1.shape)
-        f_nus11 = jnp.broadcast_to(f_nus1[None,:,None], comp1.shape)
-        f_nus12 = jnp.broadcast_to(f_nus1[None,None,:], comp1.shape)
-        f_nus21 = jnp.broadcast_to(f_nus2[None,:,None], comp2.shape)
-        f_nus22 = jnp.broadcast_to(f_nus2[None,None,:], comp2.shape)
-
-        compx = clx * (f_nus11 * f_nus22 + f_nus21 * f_nus12)
-        return comp1 + comp2 + compx
-        """
 
     @property
     def n(self):

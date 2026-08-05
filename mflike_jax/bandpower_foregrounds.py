@@ -6,9 +6,9 @@ from cobaya.yaml import yaml_load_file
 from cobaya.tools import resolve_packages_path
 from scipy import constants
 
-import fg_model as fgm
-import fg_power as fgp
-import fg_sed as fgf
+from . import fg_model as fgm
+from . import fg_power as fgp
+from . import fg_sed as fgf
 
 T_CMB = 2.72548
 
