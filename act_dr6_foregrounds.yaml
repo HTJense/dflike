@@ -19,14 +19,94 @@ bandint_freqs: [220, 90, 150, 90, 150]
 
 components:
   tt:
-    - kSZ
-    - tSZ_and_CIB
-    - cibp
-    - dust
-    - radio
+    kSZ:
+      CrossProductModel:
+        - TemplateCl:
+            filename: cl_ksz_bat.dat
+        - ConstantSED:
+      params:
+        - a_kSZ
+    tSZ_and_CIB:
+      CorrelatedCrossProductModel:
+        - RescaledTemplateCl:
+            filename: cl_tsz_150_bat.dat
+        - RescaledTemplateCl:
+            filename: cl_cib_Choi2020.dat
+            alpha_0: 0.8
+        - TemplateCl:
+            filename: cl_sz_x_cib.dat
+        - ThermalSZSED:
+        - ModifiedBlackBodySED:
+      params:
+        - a_tSZ
+        - alpha_tSZ
+        - a_c
+        - alpha_c
+        - xi
+        - beta_c
+        - T_d
+    cibp:
+      CrossProductModel:
+        - PoissonCl:
+        - ModifiedBlackBodySED:
+      params:
+        - a_p
+        - alpha_p
+        - beta_p
+        - T_d
+    radio:
+      CrossProductModel:
+        - PoissonCl:
+        - PowerLawSED:
+      params:
+        - a_s
+        - alpha_s
+        - beta_s
+    dust:
+      CrossProductModel:
+        - PowerLawCl:
+            ell_0: 500
+        - ModifiedBlackBodySED:
+      params:
+        - a_gtt
+        - alpha_dT
+        - beta_d
+        - T_effd
   te:
-    - radio
-    - dust
+    radio:
+      CrossProductModel:
+        - PoissonCl:
+        - PowerLawSED:
+      params:
+        - a_pste
+        - alpha_s
+        - beta_s
+    dust:
+      CrossProductModel:
+        - PowerLawCl:
+            ell_0: 500
+        - ModifiedBlackBodySED:
+      params:
+        - a_gte
+        - alpha_dE
+        - beta_d
+        - T_effd
   ee:
-    - radio
-    - dust
+    radio:
+      CrossProductModel:
+        - PoissonCl:
+        - PowerLawSED:
+      params:
+        - a_psee
+        - alpha_s
+        - beta_s
+    dust:
+      CrossProductModel:
+        - PowerLawCl:
+            ell_0: 500
+        - ModifiedBlackBodySED:
+      params:
+        - a_gee
+        - alpha_dE
+        - beta_d
+        - T_effd

@@ -152,10 +152,11 @@ hess = jax.hessian(logpost)
 
 # These two are functions, we can evaluate them at the same values and find
 # derivatives:
+dL = grad(theta)
 H = hess(theta)
 cov = jnp.linalg.inv(H)
 err = np.sqrt(np.diag(cov))
 
 for i, par in enumerate(free_params):
-    print(f"{par}: {theta[i]:.2f} +/- {err[i]:.2f}")
+    print(f"{par:>30s} = {theta[i]:8.2f} +/- {err[i]:5.2f} | dL/d{par:<30s} = {dL[i]:8.2f}")
 

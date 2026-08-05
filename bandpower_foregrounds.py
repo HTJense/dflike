@@ -20,7 +20,8 @@ def _cmb2bb(nu, T=T_CMB):
 class BandpowerForegrounds:
     def __init__(self, config, likelihood, lmax=9000):
         self.config = yaml_load_file(config)
-        defaults = self.config["normalisation"]
+
+        """
         self.ksz = fgm.CrossProductModel(fgp.TemplateCl("cl_ksz_bat.dat", **defaults), fgf.ConstantSED(**defaults))
 
         self.tsz_and_cib = fgm.CorrelatedCrossProductModel(
@@ -34,6 +35,8 @@ class BandpowerForegrounds:
         self.cibp = fgm.CrossProductModel(fgp.PoissonCl(**defaults), fgf.ModifiedBlackBodySED(**defaults))
         self.radio = fgm.CrossProductModel(fgp.PoissonCl(**defaults), fgf.PowerLawSED(**defaults))
         self.dust = fgm.CrossProductModel(fgp.PowerLawCl(ell0=500), fgf.ModifiedBlackBodySED(**defaults))
+        """
+
 
         self.ells = likelihood.ells
         self.experiments = self.config["experiments"]
@@ -41,17 +44,57 @@ class BandpowerForegrounds:
         self.bp = [ jnp.array(likelihood.tracers[exp + "_s0"]["bp"] / np.trapezoid(likelihood.tracers[exp + "_s0"]["bp"], likelihood.tracers[exp + "_s0"]["nu"])) for exp in self.experiments ]
 
         self.parameters = [
-            "a_tSZ", "alpha_tSZ", "a_kSZ",
-            "xi", "a_c", "beta_c", "a_p", "beta_p",
-            "a_s", "beta_s",
-            "a_gtt", "a_gte", "a_gee",
-            "a_pste", "a_psee",
-            "alpha_c", "alpha_s", "T_d", "alpha_p", "alpha_dT", "alpha_dE", "beta_d", "T_effd"
         ]
-        self.fg_index = jnp.array(np.arange(len(self.parameters)))
         for exp in self.experiments:
             self.parameters.append(f"bandint_shift_{exp}")
         self.bp_index = jnp.array([ self.parameters.index(f"bandint_shift_{exp}") for exp in self.experiments ])
+
+        self.build_foreground_model(self.config["components"])
+
+    def build_foreground_model(self, config):
+        # TODO: cleanup this function >_<
+        self.foreground_components = {cl: [] for cl in config}
+        self.fg_indices = {cl: [] for cl in config}
+        defaults = self.config["normalisation"]
+
+        for cl in config:
+            cl_indices = []
+
+            for component in config[cl]:
+                model_config = config[cl][component]
+                mod_name = list(model_config.keys())[0]
+                param_names = model_config["params"]
+                mod = getattr(fgm, mod_name)
+                model_products = []
+                for product in model_config[mod_name]:
+                    tmpl_name = list(product.keys())[0]
+                    settings = product[tmpl_name]
+                    settings = defaults | (settings or {})
+                    if hasattr(fgp, tmpl_name):
+                        template = getattr(fgp, tmpl_name)
+                    elif hasattr(fgf, tmpl_name):
+                        template = getattr(fgf, tmpl_name)
+                    else:
+                        raise ImportError(f"Failed to find {tmpl_name} amongs Cl/SED templates. Check spelling?")
+
+                    model_products.append( template(**settings) )
+                model = mod(*model_products)
+
+                n_req = model.n
+                n_prov = len(model_config["params"])
+
+                assert n_req == n_prov, f"Configuration provided {n_prov} parameters for component {component}, but {n_req} are required."
+
+                self.foreground_components[cl].append(model)
+
+                indices = []
+                for param in model_config["params"]:
+                    if param not in self.parameters:
+                        self.parameters.append(param)
+                    indices.append(self.parameters.index(param))
+                cl_indices.append(jnp.array(indices))
+
+            self.fg_indices[cl] = cl_indices
 
     @partial(jax.jit, static_argnums=(0,))
     def apply_bandpass_shifts(self, bandint_theta):
@@ -65,57 +108,15 @@ class BandpowerForegrounds:
 
         return nus, bps
 
-    @partial(jax.jit, static_argnums=(0,))
+    #@partial(jax.jit, static_argnums=(0,))
     def get_foreground_model(self, theta):
         nu, bp = self.apply_bandpass_shifts(theta[self.bp_index])
 
-        params = { k: theta[i] for i, k in enumerate(self.parameters) }
+        foregrounds = [ jnp.zeros((*self.ells.shape, len(self.experiments), len(self.experiments))) for _ in self.foreground_components ]
 
-        ksz = params["a_kSZ"] * self.ksz(
-            {"ell": self.ells},
-            {"nu": nu, "bp": bp}
-        )
-        tsz_and_cib = self.tsz_and_cib(
-            {"amp": params["a_tSZ"], "ell": self.ells, "alpha": params["alpha_tSZ"]},
-            {"amp": params["a_c"], "ell": self.ells, "alpha": params["alpha_c"] - 0.8},
-            {"amp": -params["xi"] * jnp.sqrt(params["a_tSZ"] * params["a_c"]), "ell": self.ells},
+        for i, cl in enumerate(self.foreground_components):
+            for idx, fg in zip(self.fg_indices[cl], self.foreground_components[cl]):
+                theta_fg = theta[idx]
+                foregrounds[i] = foregrounds[i] + fg(self.ells, nu, bp, theta_fg)
 
-            {"nu": nu, "bp": bp},
-            {"nu": nu, "bp": bp, "T": params["T_d"], "beta": params["beta_c"]}
-        )
-        cibp = params["a_p"] * self.cibp(
-            {"ell": self.ells, "alpha": params["alpha_p"]},
-            {"nu": nu, "bp": bp, "T": params["T_d"], "beta": params["beta_p"]}
-        )
-        radiott = params["a_s"] * self.radio(
-            {"ell": self.ells, "alpha": params["alpha_s"]},
-            {"nu": nu, "bp": bp, "beta": params["beta_s"]}
-        )
-        dusttt = params["a_gtt"] * self.dust(
-            {"ell": self.ells, "alpha": params["alpha_dT"]},
-            {"nu": nu, "bp": bp, "T": params["T_effd"], "beta": params["beta_d"]}
-        )
-
-        radiote = params["a_pste"] * self.radio(
-            {"ell": self.ells, "alpha": params["alpha_s"]},
-            {"nu": nu, "bp": bp, "beta": params["beta_s"]}
-        )
-        dustte = params["a_gte"] * self.dust(
-            {"ell": self.ells, "alpha": params["alpha_dE"]},
-            {"nu": nu, "bp": bp, "T": params["T_effd"], "beta": params["beta_d"]}
-        )
-
-        radioee = params["a_psee"] * self.radio(
-            {"ell": self.ells, "alpha": params["alpha_s"]},
-            {"nu": nu, "bp": bp, "beta": params["beta_s"]}
-        )
-        dustee = params["a_gee"] * self.dust(
-            {"ell": self.ells, "alpha": params["alpha_dE"]},
-            {"nu": nu, "bp": bp, "T": params["T_effd"], "beta": params["beta_d"]}
-        )
-
-        fg_tt = tsz_and_cib + ksz + cibp + radiott + dusttt
-        fg_te = radiote + dustte
-        fg_ee = radioee + dustee
-
-        return jnp.stack([ fg_tt, fg_te, fg_ee ])
+        return jnp.stack(foregrounds)

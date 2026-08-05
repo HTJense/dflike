@@ -4,7 +4,6 @@ import jax
 import jax.numpy as jnp
 
 
-@jax.jit
 def _bp_int(nu, f, bp):
     return jnp.trapezoid(f * bp, nu)
 
@@ -18,19 +17,21 @@ class CrossProductModel:
         self.sed = sed
 
     @partial(jax.jit, static_argnums=(0,))
-    def __call__(self, power_params, sed):
-        cl = self.power(**power_params)
+    def __call__(self, ell, nus, bps, theta):
+        theta_cl = theta[:self.power.n]
+        theta_sed = theta[self.power.n:]
 
-        nus = sed["nu"]
-        bps = sed["bp"]
-        sed_args = {k: v for k, v in sed.items() if k not in ("nu", "bp")}
+        cl = self.power(ell, theta_cl)
 
-        f_nus = jnp.zeros((len(nus),))
+        f_nus = jnp.zeros((len(nus,)))
         for i, (nu, bp) in enumerate(zip(nus, bps)):
-            f_nu = self.sed(nu=nu, **sed_args)
+            f_nu = self.sed(nu, theta_sed)
             f_nus = f_nus.at[i].set(_bp_int(nu, f_nu, bp))
-
         return jnp.einsum("...i,...j,...l->...ijl", cl, f_nus, f_nus)
+
+    @property
+    def n(self):
+        return self.power.n + self.sed.n
 
 
 class CorrelatedCrossProductModel:
@@ -47,9 +48,39 @@ class CorrelatedCrossProductModel:
         self.powerx = powerx
         self.sed1 = sed1
         self.sed2 = sed2
+        self.n_p1 = jnp.arange(self.power1.n)
+        self.n_p2 = jnp.arange(self.power2.n) + self.power1.n
+        self.n_px = jnp.arange(self.powerx.n) + self.power1.n + self.power2.n
+        self.n_s1 = jnp.arange(self.sed1.n) + self.power1.n + self.power2.n + self.powerx.n
+        self.n_s2 = jnp.arange(self.sed2.n) + self.power1.n + self.power2.n + self.powerx.n + self.sed1.n
 
     @partial(jax.jit, static_argnums=(0,))
-    def __call__(self, power1_params, power2_params, powerx_params, sed1_params, sed2_params):
+    def __call__(self, ell, nus, bps, theta):
+        theta_cl1 = theta[self.n_p1]
+        theta_cl2 = theta[self.n_p2]
+        theta_clx = theta[self.n_px]
+        theta_s1 = theta[self.n_s1]
+        theta_s2 = theta[self.n_s2]
+
+        cl1 = self.power1(ell, theta_cl1)
+        cl2 = self.power2(ell, theta_cl2)
+        clx = self.powerx(ell, theta_clx)
+
+        f_nus1 = jnp.zeros((len(nus),))
+        f_nus2 = jnp.zeros((len(nus),))
+        for i, (nu, bp) in enumerate(zip(nus, bps)):
+            f_nu = self.sed1(nu, theta_s1)
+            f_nus1 = f_nus1.at[i].set(_bp_int(nu, f_nu, bp))
+
+            f_nu = self.sed2(nu, theta_s2)
+            f_nus2 = f_nus2.at[i].set(_bp_int(nu, f_nu, bp))
+
+        comp1 = jnp.einsum("...i,...j,...l->...ijl", cl1, f_nus1, f_nus1)
+        comp2 = jnp.einsum("...i,...j,...l->...ijl", cl2, f_nus2, f_nus2)
+        compx = clx[:,None,None] * jnp.sqrt(self.power1.amp(theta_cl1) * self.power2.amp(theta_cl2)) * (f_nus1[None,:,None] * f_nus2[None,None,:] + f_nus1[None,None,:] * f_nus2[None,:,None])
+
+        return comp1 + comp2 - compx
+        """
         cl1 = self.power1(**power1_params)
         cl2 = self.power2(**power2_params)
         clx = self.powerx(**powerx_params)
@@ -83,4 +114,8 @@ class CorrelatedCrossProductModel:
 
         compx = clx * (f_nus11 * f_nus22 + f_nus21 * f_nus12)
         return comp1 + comp2 + compx
+        """
 
+    @property
+    def n(self):
+        return self.power1.n + self.power2.n + self.powerx.n + self.sed1.n + self.sed2.n
