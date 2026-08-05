@@ -117,9 +117,14 @@ class MFLike_jax:
         return self.calibrate_spectra(spec, theta)
 
     @partial(jax.jit, static_argnums=(0,))
+    def get_model(self, dltt, dlte, dlee, foregrounds, theta):
+        """ Get the binned data model. """
+        model = self.get_unbinned_model(dltt, dlte, dlee, foregrounds, theta)
+        return self.bin_spectra(model)
+
+    @partial(jax.jit, static_argnums=(0,))
     def chisquare(self, dltt, dlte, dlee, foregrounds, theta):
-        spec = self.get_unbinned_model(dltt, dlte, dlee, foregrounds, theta)
-        binned_spec = self.bin_spectra(spec)
-        delta = self.data_vec - binned_spec
+        model = self.get_model(dltt, dlte, dlee, foregrounds, theta)
+        delta = self.data_vec - model
         chi2 = delta @ self.inv_cov @ delta
         return chi2
