@@ -43,7 +43,7 @@ components:
         - a_c
         - alpha_c
         - xi
-        - beta_c
+        - beta_cib
         - T_d
     cibp:
       CrossProductModel:
@@ -52,7 +52,7 @@ components:
       params:
         - a_p
         - alpha_p
-        - beta_p
+        - beta_cib
         - T_d
     radio:
       CrossProductModel:
