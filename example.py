@@ -176,9 +176,9 @@ def logpost_baseline(theta_x):
 theta_baseline = jnp.array([params_values[p] for p in parameters_baseline])
 
 """ We can simply evaluate these functions directly: """
-print("log(prior) = ", logprior(theta_default))
-print("log(like)  = ", loglike(theta_default))
-print("log(post)  = ", logpost(theta_default))
+print(f"log(prior) = {logprior(theta_default):>9.4f}")
+print(f"log(like)  = {loglike(theta_default):>9.4f}")
+print(f"log(post)  = {logpost(theta_default):>9.4f}")
 
 """ Or we can do some jax things with them: """
 grad = jax.grad(logpost_baseline)
