@@ -81,39 +81,6 @@ sys_params = {
     "bandint_shift_dr6_pa6_f150": 0.0,
 }
 
-deriv_params = [
-    "a_tSZ",
-    "alpha_tSZ",
-    "a_kSZ",
-    "a_c",
-    "a_p",
-    "beta_p",
-    "beta_c",
-    "xi",
-    "a_s",
-    "beta_s",
-    "a_pste",
-    "a_psee",
-    "a_gtt",
-    "a_gte",
-    "a_gee",
-    "calG_all",
-    "cal_dr6_pa4_f220",
-    "cal_dr6_pa5_f090",
-    "cal_dr6_pa5_f150",
-    "cal_dr6_pa6_f090",
-    "cal_dr6_pa6_f150",
-    "calE_dr6_pa5_f090",
-    "calE_dr6_pa5_f150",
-    "calE_dr6_pa6_f090",
-    "calE_dr6_pa6_f150",
-    "bandint_shift_dr6_pa4_f220",
-    "bandint_shift_dr6_pa5_f090",
-    "bandint_shift_dr6_pa5_f150",
-    "bandint_shift_dr6_pa6_f090",
-    "bandint_shift_dr6_pa6_f150",
-]
-
 params_values = fg_params | sys_params
 
 model_params = like.parameters + fg_model.parameters
@@ -225,6 +192,6 @@ H = hess(theta_baseline)
 cov = jnp.linalg.inv(-H)
 err = np.sqrt(np.diag(cov))
 
-for i, par in enumerate(deriv_params):
+for i, par in enumerate(parameters_baseline):
     print(f"{par:>30s} = {params_values[par]:8.2f} +/- " +
           (f"{err[i]:4.2e}" if err[i] < 0.01 else f"{err[i]:4.2f}"))
