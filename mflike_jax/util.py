@@ -53,7 +53,7 @@ def newton_raphson(func, x0, n_steps, param_ranges=None, alpha0=1.0, tqdm=lambda
 		chain.append(z_to_x(z))
 
 		# Step size very small, we're close to convergence.
-		if jnp.linalg.norm(dz, ord=jnp.inf) < 1e-8:
+		if jnp.linalg.norm(dz, ord=jnp.inf) < 1e-5:
 			return chain
 
 	return chain
@@ -103,7 +103,7 @@ def newton_raphson_multi(func, x0, n_steps, param_ranges=None, alpha0=1.0, tqdm=
 			z = z + alpha * dz
 			chain.append(z_to_x(z))
 
-			if jnp.linalg.norm(dz, ord=jnp.inf) < 1e-8:
+			if jnp.linalg.norm(dz, ord=jnp.inf) < 1e-5:
 				break
 
 		chains.append(np.array(chain))

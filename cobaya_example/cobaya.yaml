@@ -1,0 +1,25 @@
+output: chains/actjax-tau_lcdm_camb
+
+sampler:
+  mcmc:
+
+likelihood:
+  mflike_jax:
+    stop_at_error: true
+    like_config_file: ../act_dr6.yaml
+    fg_config_file: ../act_dr6_foregrounds.yaml
+
+theory:
+  camb:
+    stop_at_error: true
+    extra_args:
+      lens_potential_accuracy: 8
+      lmax: 9000
+
+params: !defaults [cosmology, foregrounds, systematics]
+
+prior:
+  tau_prior: "lambda tau: stats.norm.logpdf(tau, loc=5.66e-2, scale=5.8e-3)"
+  tt_dust_prior: "lambda a_gtt: stats.norm.logpdf(a_gtt, loc=7.95, scale=0.32)"
+  te_dust_prior: "lambda a_gte: stats.norm.logpdf(a_gte, loc=0.423, scale=0.03)"
+  ee_dust_prior: "lambda a_gee: stats.norm.logpdf(a_gee, loc=0.1681, scale=0.017)"

@@ -21,23 +21,6 @@ class BandpowerForegrounds:
     def __init__(self, config, likelihood, lmax=9000):
         self.config = yaml_load_file(config)
 
-        """
-        self.ksz = fgm.CrossProductModel(fgp.TemplateCl("cl_ksz_bat.dat", **defaults), fgf.ConstantSED(**defaults))
-
-        self.tsz_and_cib = fgm.CorrelatedCrossProductModel(
-            fgp.RescaledTemplateCl("cl_tsz_150_bat.dat", **defaults),
-            fgp.RescaledTemplateCl("cl_cib_Choi2020.dat", **defaults),
-            fgp.TemplateCl("cl_sz_x_cib.dat", **defaults),
-            fgf.ThermalSZSED(**defaults),
-            fgf.ModifiedBlackBodySED(**defaults)
-        )
-
-        self.cibp = fgm.CrossProductModel(fgp.PoissonCl(**defaults), fgf.ModifiedBlackBodySED(**defaults))
-        self.radio = fgm.CrossProductModel(fgp.PoissonCl(**defaults), fgf.PowerLawSED(**defaults))
-        self.dust = fgm.CrossProductModel(fgp.PowerLawCl(ell0=500), fgf.ModifiedBlackBodySED(**defaults))
-        """
-
-
         self.ells = likelihood.ells
         self.experiments = self.config["experiments"]
         self.nu = [ jnp.array(likelihood.tracers[exp + "_s0"]["nu"]) for exp in self.experiments ]
@@ -108,7 +91,7 @@ class BandpowerForegrounds:
 
         return nus, bps
 
-    #@partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def get_foreground_model(self, theta):
         nu, bp = self.apply_bandpass_shifts(theta[self.bp_index])
 
