@@ -1,4 +1,3 @@
-import numpy as np
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -30,6 +29,7 @@ class ConstantSED:
     def n(self):
         return 0
 
+
 class PowerLawSED:
     """
         f(nu) = (nu / nu_0) ** beta
@@ -39,11 +39,13 @@ class PowerLawSED:
 
     @partial(jax.jit, static_argnums=(0,))
     def __call__(self, nu, theta):
-        return (nu / self.nu_0) ** theta[0] * (_rj2cmb(nu) / _rj2cmb(self.nu_0))
+        return ((nu / self.nu_0) ** theta[0]
+                * (_rj2cmb(nu) / _rj2cmb(self.nu_0)))
 
     @property
     def n(self):
         return 1
+
 
 class ModifiedBlackBodySED:
     """
@@ -56,11 +58,14 @@ class ModifiedBlackBodySED:
     def __call__(self, nu, theta):
         x = nu * hk_GHz / theta[1]
         x0 = self.nu_0 * hk_GHz / theta[1]
-        return (nu / self.nu_0) ** (theta[0] + 1.) * (_rj2cmb(nu) / _rj2cmb(self.nu_0)) * (jnp.expm1(x0) / jnp.expm1(x))
+        return ((nu / self.nu_0) ** (theta[0] + 1.)
+                * (_rj2cmb(nu) / _rj2cmb(self.nu_0))
+                * (jnp.expm1(x0) / jnp.expm1(x)))
 
     @property
     def n(self):
         return 2
+
 
 class ThermalSZSED:
     """

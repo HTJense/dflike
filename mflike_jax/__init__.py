@@ -1,7 +1,8 @@
-from .likelihood import MFLike_jax
-from .bandpower_foregrounds import BandpowerForegrounds
+from .likelihood import MFLike_jax  # noqa: F401
+from .bandpower_foregrounds import BandpowerForegrounds  # noqa: F401
+
 
 def get_cobaya_class():
-	from .cobaya import MFLike_jax_cobaya
+    from .cobaya import MFLike_jax_cobaya
 
-	return MFLike_jax_cobaya
+    return MFLike_jax_cobaya

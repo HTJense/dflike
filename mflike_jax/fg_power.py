@@ -49,6 +49,7 @@ class PoissonCl:
     def amp(self, theta):
         return theta[0]
 
+
 class TemplateCl:
     """
        C_ell = C_ell^template / C_ell_0^template
@@ -74,9 +75,11 @@ class TemplateCl:
     def amp(self, theta):
         return theta[0]
 
+
 class RescaledTemplateCl(TemplateCl):
     """
-       C_ell = C_ell^template / C_ell_0^template * (ell / ell_0) ** (alpha - alpha_0)
+       C_ell = C_ell^template / C_ell_0^template
+               * (ell / ell_0) ** (alpha - alpha_0)
     """
     def __init__(self, filename, ell_0=3000, alpha_0=0.0, **kwargs):
         super().__init__(filename, ell_0, **kwargs)
@@ -85,7 +88,8 @@ class RescaledTemplateCl(TemplateCl):
     @partial(jax.jit, static_argnums=(0,))
     def __call__(self, ell, theta):
         ls = jnp.where(ell <= 0, 1, ell)
-        cl = theta[0] * self.template_cl[ls] * (ls / self.ell_0) ** (theta[1] - self.alpha_0)
+        cl = (theta[0] * self.template_cl[ls]
+              * (ls / self.ell_0) ** (theta[1] - self.alpha_0))
         return jnp.where(ell <= 0, 0, cl)
 
     @property

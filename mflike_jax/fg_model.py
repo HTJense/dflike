@@ -1,4 +1,3 @@
-import numpy as np
 from functools import partial
 import jax
 import jax.numpy as jnp
@@ -40,7 +39,9 @@ class CorrelatedCrossProductModel:
         C_ell^(nu1xnu2) =
             a_A * C_ell^A f^A(nu1) f^A(nu2)
             + a_B * C_ell^B f^B(nu1) f^B(nu2)
-            - a_(AxB) sqrt(a_A a_B) C_ell^(AxB) (f^A(nu1) f^B(nu2) + f^A(nu2) f^B(nu1)
+            - a_(AxB) sqrt(a_A a_B) C_ell^(AxB) (
+                  f^A(nu1) f^B(nu2) + f^A(nu2) f^B(nu1)
+              )
     """
     def __init__(self, power1, power2, powerx, sed1, sed2):
         self.power1 = power1
@@ -48,11 +49,13 @@ class CorrelatedCrossProductModel:
         self.powerx = powerx
         self.sed1 = sed1
         self.sed2 = sed2
-        self.n_p1 = jnp.arange(self.power1.n)
-        self.n_p2 = jnp.arange(self.power2.n) + self.power1.n
-        self.n_px = jnp.arange(self.powerx.n) + self.power1.n + self.power2.n
-        self.n_s1 = jnp.arange(self.sed1.n) + self.power1.n + self.power2.n + self.powerx.n
-        self.n_s2 = jnp.arange(self.sed2.n) + self.power1.n + self.power2.n + self.powerx.n + self.sed1.n
+        self.n_p1 = (jnp.arange(self.power1.n))
+        self.n_p2 = (jnp.arange(self.power2.n) + self.power1.n)
+        self.n_px = (jnp.arange(self.powerx.n) + self.power1.n + self.power2.n)
+        self.n_s1 = (jnp.arange(self.sed1.n) + self.power1.n + self.power2.n
+                     + self.powerx.n)
+        self.n_s2 = (jnp.arange(self.sed2.n) + self.power1.n + self.power2.n
+                     + self.powerx.n + self.sed1.n)
 
     @partial(jax.jit, static_argnums=(0,))
     def __call__(self, ell, nus, bps, theta):
@@ -77,10 +80,14 @@ class CorrelatedCrossProductModel:
 
         comp1 = jnp.einsum("...i,...j,...l->...ijl", cl1, f_nus1, f_nus1)
         comp2 = jnp.einsum("...i,...j,...l->...ijl", cl2, f_nus2, f_nus2)
-        compx = clx[:,None,None] * jnp.sqrt(self.power1.amp(theta_cl1) * self.power2.amp(theta_cl2)) * (f_nus1[None,:,None] * f_nus2[None,None,:] + f_nus1[None,None,:] * f_nus2[None,:,None])
+        compx = (clx[:, None, None] * jnp.sqrt(self.power1.amp(theta_cl1)
+                 * self.power2.amp(theta_cl2))
+                 * (f_nus1[None, :, None] * f_nus2[None, None, :]
+                    + f_nus1[None, None, :] * f_nus2[None, :, None]))
 
         return comp1 + comp2 - compx
 
     @property
     def n(self):
-        return self.power1.n + self.power2.n + self.powerx.n + self.sed1.n + self.sed2.n
+        return (self.power1.n + self.power2.n + self.powerx.n + self.sed1.n
+                + self.sed2.n)
