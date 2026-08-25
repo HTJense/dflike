@@ -24,18 +24,11 @@ class BandpowerForegrounds:
 
         self.ells = likelihood.ells
         self.experiments = self.config["experiments"]
-        self.nu = [jnp.array(likelihood.tracers[exp + "_s0"]["nu"])
-                   for exp in self.experiments]
-        self.bp = []
-        
-        for exp in self.experiments:
-            nu = likelihood.tracers[exp + "_s0"]["nu"]
-            bp = likelihood.tracers[exp + "_s0"]["bp"]
-            beam = likelihood.tracers[exp + "_s0"]["beam"]
-            bp_beam = bp[:, None] * beam[:, self.ells]
 
-            self.nu.append(jnp.array(nu))
-            self.bp.append(jnp.array(bp_beam / np.trapezoid(bp_beam, nu, axis=0)))
+        if self.config["beam_profile"] is None:
+            self.init_beam_flat(likelihood)
+        elif "beam_from_file" in self.config["beam_profile"]:
+            self.init_beam_from_file(likelihood)
 
         self.parameters = []
         for exp in self.experiments:
@@ -45,6 +38,35 @@ class BandpowerForegrounds:
              for exp in self.experiments])
 
         self.build_foreground_model(self.config["components"])
+
+    def init_beam_flat(self, likelihood):
+        self.nu = [jnp.array(likelihood.tracers[exp + "_s0"]["nu"])
+                   for exp in self.experiments]
+        self.bp = []
+
+        for exp in self.experiments:
+            nu = likelihood.tracers[exp + "_s0"]["nu"]
+            bp = likelihood.tracers[exp + "_s0"]["bp"]
+            beam = np.ones_like(self.ells)
+            bp_beam = bp[:, None] * beam[None, :]
+
+            self.bp.append(jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
+                                                            axis=0)))
+
+    def init_beam_from_file(self, likelihood):
+        self.nu = [jnp.array(likelihood.tracers[exp + "_s0"]["nu"])
+                   for exp in self.experiments]
+        self.bp = []
+
+        for exp in self.experiments:
+            nu = likelihood.tracers[exp + "_s0"]["nu"]
+            bp = likelihood.tracers[exp + "_s0"]["bp"]
+            beam = likelihood.tracers[exp + "_s0"]["beam"]
+            bp_beam = bp[:, None] * beam[:, self.ells]
+
+            self.nu.append(jnp.array(nu))
+            self.bp.append(jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
+                                                            axis=0)))
 
     def build_foreground_model(self, config):
         # TODO: cleanup this function >_<
