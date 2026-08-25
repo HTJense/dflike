@@ -5,7 +5,10 @@ import jax.numpy as jnp
 
 def _bp_int(nu, f, bp):
     f = jnp.broadcast_to(f[:, None], bp.shape)
-    return jnp.trapezoid(f * bp, nu, axis=0)
+    if len(nu) > 1:
+        return jnp.trapezoid(f * bp, nu, axis=0)
+    else:
+        return (f * bp)[0]
 
 
 class CrossProductModel:

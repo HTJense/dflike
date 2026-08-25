@@ -72,8 +72,10 @@ class BandpowerForegrounds:
             bp_beam = bp[:, None] * np.ones((1, len(self.ells)))
 
             self.nu[i] = jnp.array(nu)
-            self.bp[i] = jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
-                                                          axis=0))
+            if len(nu) > 1:
+                bp_beam = bp_beam / np.trapezoid(bp_beam, nu, axis=0)
+
+            self.bp[i] = jnp.array(bp_beam)
 
     def init_beam_from_file(self, likelihood):
         for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp, self.nu)):
@@ -81,8 +83,10 @@ class BandpowerForegrounds:
             bp_beam = bp[:, None] * beam[:, self.ells]
 
             self.nu[i] = jnp.array(nu)
-            self.bp[i] = jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
-                                                          axis=0))
+            if len(nu) > 1:
+                bp_beam = bp_beam / np.trapezoid(bp_beam, nu, axis=0)
+
+            self.bp[i] = jnp.array(bp_beam)
 
     def build_foreground_model(self, config):
         # TODO: cleanup this function >_<
@@ -140,15 +144,21 @@ class BandpowerForegrounds:
                                               self.bp)):
             nub = nu + bandint_theta[i]
             nus.append(nub)
-            nup = jnp.broadcast_to(_cmb2bb(nub)[:, None], bp.shape)
-            bps.append(bp * nup
-                       / jnp.trapezoid(bp * nup, nub, axis=0))
+            if len(nub) > 1:
+                nup = jnp.broadcast_to(_cmb2bb(nub)[:, None], bp.shape)
+                bp_beam = bp * nup
+                bp_beam = bp_beam / jnp.trapezoid(bp_beam, nub, axis=0)
+            else:
+                bp_beam = bp
+            bps.append(bp_beam)
 
         return nus, bps
 
     @partial(jax.jit, static_argnums=(0,))
     def get_foreground_model(self, theta):
         nu, bp = self.apply_bandpass_shifts(theta[self.bp_index])
+        for exp, n, b in zip(self.experiments, nu, bp):
+            print(exp, n.shape, b.shape)
 
         foregrounds = [jnp.zeros((*self.ells.shape, len(self.experiments),
                                   len(self.experiments)))
