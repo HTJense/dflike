@@ -157,8 +157,6 @@ class BandpowerForegrounds:
     @partial(jax.jit, static_argnums=(0,))
     def get_foreground_model(self, theta):
         nu, bp = self.apply_bandpass_shifts(theta[self.bp_index])
-        for exp, n, b in zip(self.experiments, nu, bp):
-            print(exp, n.shape, b.shape)
 
         foregrounds = [jnp.zeros((*self.ells.shape, len(self.experiments),
                                   len(self.experiments)))
