@@ -19,11 +19,19 @@ def _cmb2bb(nu, T=T_CMB):
 
 
 class BandpowerForegrounds:
-    def __init__(self, config, likelihood, lmax=9000):
-        self.config = yaml_load_file(config)
+    def __init__(self, config: str | dict, likelihood, lmax: int = 9000):
+        if type(config) is str:
+            self.config = yaml_load_file(config)
+        elif type(config) is dict:
+            self.config = config
 
         self.ells = likelihood.ells
         self.experiments = self.config["experiments"]
+
+        if self.config["top_hat_band"] is None:
+            self.load_bandpass_from_file(likelihood)
+        else:
+            self.build_bandpass(likelihood)
 
         if self.config["beam_profile"] is None:
             self.init_beam_flat(likelihood)
@@ -39,34 +47,42 @@ class BandpowerForegrounds:
 
         self.build_foreground_model(self.config["components"])
 
-    def init_beam_flat(self, likelihood):
-        self.nu = [jnp.array(likelihood.tracers[exp + "_s0"]["nu"])
+    def load_bandpass_from_file(self, likelihood):
+        self.nu = [likelihood.tracers[exp + "_s0"]["nu"]
                    for exp in self.experiments]
+        self.bp = [likelihood.tracers[exp + "_s0"]["bp"]
+                   for exp in self.experiments]
+
+    def build_bandpass(self, likelihood):
+        self.nu = []
         self.bp = []
 
-        for exp in self.experiments:
-            nu = likelihood.tracers[exp + "_s0"]["nu"]
-            bp = likelihood.tracers[exp + "_s0"]["bp"]
-            beam = np.ones_like(self.ells)
-            bp_beam = bp[:, None] * beam[None, :]
+        nsteps = self.config["top_hat_band"]["nsteps"]
+        bandwidth = self.config["top_hat_band"]["bandwidth"]
+        if type(bandwidth) is not list:
+            bandwidth = [bandwidth for _ in self.experiments]
+        nu_mid = self.config["bandint_freqs"]
 
-            self.bp.append(jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
-                                                            axis=0)))
+        for i, (num, bw) in enumerate(zip(nu_mid, bandwidth)):
+            self.nu.append(np.linspace(num - bw / 2., num + bw / 2., nsteps))
+            self.bp.append(np.ones((nsteps,)))
+
+    def init_beam_flat(self, likelihood):
+        for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp, self.nu)):
+            bp_beam = bp[:, None] * np.ones((1, len(self.ells)))
+
+            self.nu[i] = jnp.array(nu)
+            self.bp[i] = jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
+                                                          axis=0))
 
     def init_beam_from_file(self, likelihood):
-        self.nu = [jnp.array(likelihood.tracers[exp + "_s0"]["nu"])
-                   for exp in self.experiments]
-        self.bp = []
-
-        for exp in self.experiments:
-            nu = likelihood.tracers[exp + "_s0"]["nu"]
-            bp = likelihood.tracers[exp + "_s0"]["bp"]
+        for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp, self.nu)):
             beam = likelihood.tracers[exp + "_s0"]["beam"]
             bp_beam = bp[:, None] * beam[:, self.ells]
 
-            self.nu.append(jnp.array(nu))
-            self.bp.append(jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
-                                                            axis=0)))
+            self.nu[i] = jnp.array(nu)
+            self.bp[i] = jnp.array(bp_beam / np.trapezoid(bp_beam, nu,
+                                                          axis=0))
 
     def build_foreground_model(self, config):
         # TODO: cleanup this function >_<
