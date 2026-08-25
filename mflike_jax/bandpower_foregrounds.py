@@ -26,10 +26,16 @@ class BandpowerForegrounds:
         self.experiments = self.config["experiments"]
         self.nu = [jnp.array(likelihood.tracers[exp + "_s0"]["nu"])
                    for exp in self.experiments]
-        self.bp = [jnp.array(likelihood.tracers[exp + "_s0"]["bp"]
-                   / np.trapezoid(likelihood.tracers[exp + "_s0"]["bp"],
-                                  likelihood.tracers[exp + "_s0"]["nu"]))
-                   for exp in self.experiments]
+        self.bp = []
+        
+        for exp in self.experiments:
+            nu = likelihood.tracers[exp + "_s0"]["nu"]
+            bp = likelihood.tracers[exp + "_s0"]["bp"]
+            beam = likelihood.tracers[exp + "_s0"]["beam"]
+            bp_beam = bp[:, None] * beam[:, self.ells]
+
+            self.nu.append(jnp.array(nu))
+            self.bp.append(jnp.array(bp_beam / np.trapezoid(bp_beam, nu, axis=0)))
 
         self.parameters = []
         for exp in self.experiments:
@@ -96,8 +102,9 @@ class BandpowerForegrounds:
                                               self.bp)):
             nub = nu + bandint_theta[i]
             nus.append(nub)
-            bps.append(bp * _cmb2bb(nub)
-                       / jnp.trapezoid(bp * _cmb2bb(nub), nub))
+            nup = jnp.broadcast_to(_cmb2bb(nub)[:, None], bp.shape)
+            bps.append(bp * nup
+                       / jnp.trapezoid(bp * nup, nub, axis=0))
 
         return nus, bps
 

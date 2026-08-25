@@ -37,8 +37,7 @@ fg_params = {
     "a_kSZ": 1.5,
     "a_c": 3.7,
     "a_p": 7.7,
-    "beta_p": 1.9,
-    "beta_c": 1.9,
+    "beta_cib": 1.9,
     "xi": 0.09,
     "a_s": 2.9,
     "beta_s": -2.8,
@@ -62,22 +61,22 @@ fg_params = {
 sys_params = {
     "calG_all": 1.0,
 
-    "cal_dr6_pa4_f220": 0.98,
+    "cal_dr6_pa4_f220": 1.0,
     "cal_dr6_pa5_f090": 1.0,
     "cal_dr6_pa5_f150": 1.0,
     "cal_dr6_pa6_f090": 1.0,
     "cal_dr6_pa6_f150": 1.0,
 
     "calE_dr6_pa4_f220": 1.0,
-    "calE_dr6_pa5_f090": 0.985,
-    "calE_dr6_pa5_f150": 0.995,
-    "calE_dr6_pa6_f090": 1.00,
-    "calE_dr6_pa6_f150": 0.995,
+    "calE_dr6_pa5_f090": 1.0,
+    "calE_dr6_pa5_f150": 1.0,
+    "calE_dr6_pa6_f090": 1.0,
+    "calE_dr6_pa6_f150": 1.0,
 
-    "bandint_shift_dr6_pa4_f220": 5.0,
+    "bandint_shift_dr6_pa4_f220": 0.0,
     "bandint_shift_dr6_pa5_f090": 0.0,
-    "bandint_shift_dr6_pa5_f150": -1.0,
-    "bandint_shift_dr6_pa6_f090": 1.0,
+    "bandint_shift_dr6_pa5_f150": 0.0,
+    "bandint_shift_dr6_pa6_f090": 0.0,
     "bandint_shift_dr6_pa6_f150": 0.0,
 }
 
@@ -146,7 +145,7 @@ def logpost(theta):
 # These are the parameters with respect to which we want to differentiate.
 parameters_baseline = [
     "a_tSZ", "a_kSZ", "alpha_tSZ", "xi",
-    "a_c", "beta_c", "a_p", "beta_p", "a_s", "beta_s",
+    "a_c", "beta_cib", "a_p", "a_s", "beta_s",
     "a_gtt", "a_gte", "a_gee", "a_pste", "a_psee",
     "calG_all",
     "cal_dr6_pa4_f220", "cal_dr6_pa5_f090", "cal_dr6_pa5_f150",

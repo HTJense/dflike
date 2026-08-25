@@ -4,7 +4,8 @@ import jax.numpy as jnp
 
 
 def _bp_int(nu, f, bp):
-    return jnp.trapezoid(f * bp, nu)
+    f = jnp.broadcast_to(f[:, None], bp.shape)
+    return jnp.trapezoid(f * bp, nu, axis=0)
 
 
 class CrossProductModel:
@@ -22,11 +23,12 @@ class CrossProductModel:
 
         cl = self.power(ell, theta_cl)
 
-        f_nus = jnp.zeros((len(nus,)))
+        f_nus = jnp.zeros((len(ell), len(nus)))
         for i, (nu, bp) in enumerate(zip(nus, bps)):
             f_nu = self.sed(nu, theta_sed)
-            f_nus = f_nus.at[i].set(_bp_int(nu, f_nu, bp))
-        return jnp.einsum("...i,...j,...l->...ijl", cl, f_nus, f_nus)
+            f_nus = f_nus.at[:,i].set(_bp_int(nu, f_nu, bp))
+        res = jnp.einsum("...i,...ij,...il->...ijl", cl, f_nus, f_nus)
+        return res
 
     @property
     def n(self):
@@ -69,21 +71,21 @@ class CorrelatedCrossProductModel:
         cl2 = self.power2(ell, theta_cl2)
         clx = self.powerx(ell, theta_clx)
 
-        f_nus1 = jnp.zeros((len(nus),))
-        f_nus2 = jnp.zeros((len(nus),))
+        f_nus1 = jnp.zeros((len(ell), len(nus)))
+        f_nus2 = jnp.zeros((len(ell), len(nus)))
         for i, (nu, bp) in enumerate(zip(nus, bps)):
             f_nu = self.sed1(nu, theta_s1)
-            f_nus1 = f_nus1.at[i].set(_bp_int(nu, f_nu, bp))
+            f_nus1 = f_nus1.at[:,i].set(_bp_int(nu, f_nu, bp))
 
             f_nu = self.sed2(nu, theta_s2)
-            f_nus2 = f_nus2.at[i].set(_bp_int(nu, f_nu, bp))
+            f_nus2 = f_nus2.at[:,i].set(_bp_int(nu, f_nu, bp))
 
-        comp1 = jnp.einsum("...i,...j,...l->...ijl", cl1, f_nus1, f_nus1)
-        comp2 = jnp.einsum("...i,...j,...l->...ijl", cl2, f_nus2, f_nus2)
+        comp1 = jnp.einsum("...i,...ij,...il->...ijl", cl1, f_nus1, f_nus1)
+        comp2 = jnp.einsum("...i,...ij,...il->...ijl", cl2, f_nus2, f_nus2)
         compx = (clx[:, None, None] * jnp.sqrt(self.power1.amp(theta_cl1)
                  * self.power2.amp(theta_cl2))
-                 * (f_nus1[None, :, None] * f_nus2[None, None, :]
-                    + f_nus1[None, None, :] * f_nus2[None, :, None]))
+                 * (f_nus1[:, :, None] * f_nus2[:, None, :]
+                    + f_nus1[:, None, :] * f_nus2[:, :, None]))
 
         return comp1 + comp2 - compx
 
