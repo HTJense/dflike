@@ -175,22 +175,37 @@ def logpost_baseline(theta_x):
 theta_baseline = jnp.array([params_values[p] for p in parameters_baseline])
 
 """ We can simply evaluate these functions directly: """
-print(f"log(prior) = {logprior(theta_default):>9.4f}")
-print(f"log(like)  = {loglike(theta_default):>9.4f}")
-print(f"log(post)  = {logpost(theta_default):>9.4f}")
+print(f"log(prior)        = {logprior(theta_default):>9.4f}")
+print(f"log(like)         = {loglike(theta_default):>9.4f}")
+print(f"log(post)         = {logpost(theta_default):>9.4f}")
 
 """ Or we can do some jax things with them: """
-grad = jax.grad(logpost_baseline)
-hess = jax.hessian(logpost_baseline)
+grad = jax.jit(jax.grad(logpost_baseline))
+hess = jax.jit(jax.hessian(logpost_baseline))
+
+""" Example: find the best-fitting point with OPTAX. """
+import optax
+import tqdm
+
+grad_adam = jax.jit(jax.grad(lambda x: -logpost_baseline(x)))
+optimizer = optax.adam(learning_rate=0.1)
+opt_state = optimizer.init(theta_baseline)
+theta_opt = theta_baseline.copy()
+
+for _ in tqdm.tqdm(range(100)):
+	updates, opt_state = optimizer.update(grad_adam(theta_opt), opt_state, theta_opt)
+	theta_opt = optax.apply_updates(theta_opt, updates)
+
+print(f"log(post) minimum = {logpost_baseline(theta_opt):>9.4f}")
 
 # These two are functions, we can evaluate them at the same values and find
 # derivatives:
-H = hess(theta_baseline)
+H = hess(theta_opt)
 
 # Fisher estimate of the error.
 cov = jnp.linalg.inv(-H)
 err = np.sqrt(np.diag(cov))
 
 for i, par in enumerate(parameters_baseline):
-    print(f"{par:>30s} = {params_values[par]:8.2f} +/- " +
+    print(f"{par:>30s} = {theta_opt[i]:8.5f} +/- " +
           (f"{err[i]:4.2e}" if err[i] < 0.01 else f"{err[i]:4.2f}"))

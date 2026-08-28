@@ -24,6 +24,9 @@ class BandpowerForegrounds:
             self.config = yaml_load_file(config)
         elif type(config) is dict:
             self.config = config
+        else:
+            raise TypeError("Configuration should be string (filename) or "
+                            f"dictionary, but was given {type(config)}.")
 
         self.ells = likelihood.ells
         self.experiments = self.config["experiments"]
@@ -68,7 +71,8 @@ class BandpowerForegrounds:
             self.bp.append(np.ones((nsteps,)))
 
     def init_beam_flat(self, likelihood):
-        for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp, self.nu)):
+        for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp,
+                                              self.nu)):
             bp_beam = bp[:, None] * np.ones((1, len(self.ells)))
 
             self.nu[i] = jnp.array(nu)
@@ -78,7 +82,8 @@ class BandpowerForegrounds:
             self.bp[i] = jnp.array(bp_beam)
 
     def init_beam_from_file(self, likelihood):
-        for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp, self.nu)):
+        for i, (exp, bp, nu) in enumerate(zip(self.experiments, self.bp,
+                                              self.nu)):
             beam = likelihood.tracers[exp + "_s0"]["beam"]
             bp_beam = bp[:, None] * beam[:, self.ells]
 

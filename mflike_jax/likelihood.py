@@ -9,8 +9,14 @@ from cobaya.tools import resolve_packages_path
 
 
 class MFLike_jax:
-    def __init__(self, config):
-        self.config = yaml_load_file(config)
+    def __init__(self, config: str | dict):
+        if type(config) is str:
+            self.config = yaml_load_file(config)
+        elif type(config) is dict:
+            self.config = config
+        else:
+            raise TypeError("Configuration should be string (filename) or "
+                            f"dictionary, but was given {type(config)}.")
 
         data_path = os.path.join(resolve_packages_path(), "data",
                                  self.config["data_folder"])

@@ -31,7 +31,7 @@ def newton_raphson(func, x0, n_steps, param_ranges=None, alpha0=1.0,
     hess = jax.jit(jax.hessian(f))
 
     chain = [x0]
-    eps = 1e-6
+    eps = 1e-4
     c = 1e-4
 
     for i in tqdm(range(n_steps), leave=True):
