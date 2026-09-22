@@ -97,7 +97,10 @@ class MFLike_jax:
 
         self.covmat = s.covariance.covmat[data_indices, :][:, data_indices]
         self.inv_cov = jnp.asarray(np.linalg.inv(self.covmat))
-        self.logp_const = -0.5 * (np.log(2. * np.pi) * len(self.data_vec) + np.linalg.slogdet(self.inv_cov)[1])
+        self.logp_const = -0.5 * (
+            np.log(2. * np.pi) * len(self.data_vec)
+            + np.linalg.slogdet(self.inv_cov)[1]
+        )
 
     @partial(jax.jit, static_argnums=(0,))
     def bin_spectra(self, spec):

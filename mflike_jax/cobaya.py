@@ -43,7 +43,9 @@ class Lensing_jax_cobaya(Likelihood):
 
     def initialize(self):
         self.like = lensing.Lensing_jax(self.config_file)
-        self.theory = lensing_corrections.LensingCorrections(self.corr_config_file)
+        self.theory = lensing_corrections.LensingCorrections(
+            self.corr_config_file
+        )
 
     def get_requirements(self):
         reqs = {}

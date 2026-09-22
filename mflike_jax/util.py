@@ -149,9 +149,9 @@ def emulators_to_jax(parser, desired=["tt", "te", "ee"]):
             emu.training_std = emulators[f"Cl/{xy}"].features_std_
         else:
             # Non-PCA data.
-            emu.param_train_mean = emulators[f"Cl/{xy}"].parameters_mean.numpy()
+            emu.param_train_mean = emulators[f"Cl/{xy}"].parameters_mean.numpy()  # noqa: E501
             emu.param_train_std = emulators[f"Cl/{xy}"].parameters_std.numpy()
-            emu.feature_train_mean = emulators[f"Cl/{xy}"].features_mean.numpy()
+            emu.feature_train_mean = emulators[f"Cl/{xy}"].features_mean.numpy()  # noqa: E501
             emu.feature_train_std = emulators[f"Cl/{xy}"].features_std.numpy()
 
         results[xy] = emu

@@ -20,12 +20,19 @@ class LensingCorrections:
 
         data_path = self.config["data_folder"]
         if not os.path.isdir(data_path):
-            data_path = os.path.join(resolve_packages_path(), "data", self.config["data_folder"])
+            data_path = os.path.join(resolve_packages_path(), "data",
+                                     self.config["data_folder"])
 
-        fiducial = sacc.Sacc.load_fits(os.path.join(data_path, self.config["fiducial_file"]))
-        corrections = sacc.Sacc.load_fits(os.path.join(data_path, self.config["corrections_file"]))
+        fiducial = sacc.Sacc.load_fits(
+            os.path.join(data_path, self.config["fiducial_file"])
+        )
+        corrections = sacc.Sacc.load_fits(
+            os.path.join(data_path, self.config["corrections_file"])
+        )
 
-        self.ells = jnp.array(fiducial.get_ell_cl(None, "ct", "ct")[0].astype(int))
+        self.ells = jnp.array(
+            fiducial.get_ell_cl(None, "ct", "ct")[0].astype(int)
+        )
         self.fiducial = {
             "tt": jnp.array(fiducial.get_ell_cl(None, "ct", "ct")[1]),
             "te": jnp.array(fiducial.get_ell_cl(None, "ct", "ce")[1]),
@@ -45,7 +52,9 @@ class LensingCorrections:
             "ee": jnp.array(corrections.get_ell_cl("N1_ee", "ce", "ce")[1]),
             "bb": jnp.array(corrections.get_ell_cl("N1_bb", "cb", "cb")[1]),
         }
-        self.n1_clpp = jnp.array(corrections.get_ell_cl("N1_00", "cp", "cp")[1])
+        self.n1_clpp = jnp.array(
+            corrections.get_ell_cl("N1_00", "cp", "cp")[1]
+        )
         self.n0 = jnp.array(corrections.get_ell_cl("N0_00", "n0", "n0")[1][0])
 
         # The likelihood has C_ell data, so we need some
@@ -56,9 +65,8 @@ class LensingCorrections:
         )
         self.kk_factor = 2. * np.pi / 4.
 
+    @partial(jax.jit, static_argnums=(0,))
     def get_corrections(self, dltt, dlte, dlee, dlbb, dlpp, theta):
-        # Correction = 
-        # 2 (fiducial_kk - obs_kk) / n0
         cls = {
             "tt": dltt[self.ells] * self.dl_factor,
             "te": dlte[self.ells] * self.dl_factor,
@@ -69,6 +77,6 @@ class LensingCorrections:
         delta = {s: cls[s] - self.fiducial[s] for s in self.fiducial}
         n0 = sum([self.n0_response[s] @ delta[s] for s in self.n0_response])
         n1 = self.n1_clpp @ (cls["kk"] - self.fiducial["kk"]) \
-             + sum([self.n1_response[s] @ delta[s] for s in self.n1_response])
+            + sum([self.n1_response[s] @ delta[s] for s in self.n1_response])
 
         return 2. * (self.fiducial["kk"] / self.n0) * n0 + n1
