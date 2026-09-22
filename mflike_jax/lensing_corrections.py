@@ -25,5 +25,42 @@ class LensingCorrections:
         fiducial = sacc.Sacc.load_fits(os.path.join(data_path, self.config["fiducial_file"]))
         corrections = sacc.Sacc.load_fits(os.path.join(data_path, self.config["corrections_file"]))
 
-    def get_corrections(self, theta):
-        return 0.0
+        self.ells = jnp.array(fiducial.get_ell_cl(None, "ct", "ct")[0].astype(int))
+        self.fiducial = {
+            "tt": jnp.array(fiducial.get_ell_cl(None, "ct", "ct")[1]),
+            "te": jnp.array(fiducial.get_ell_cl(None, "ct", "ce")[1]),
+            "ee": jnp.array(fiducial.get_ell_cl(None, "ce", "ce")[1]),
+            "bb": jnp.array(fiducial.get_ell_cl(None, "cb", "cb")[1]),
+            "kk": jnp.array(fiducial.get_ell_cl(None, "ck", "ck")[1]),
+        }
+        self.n0_response = {
+            "tt": jnp.array(corrections.get_ell_cl("N0_00", "ct", "ct")[1]),
+            "te": jnp.array(corrections.get_ell_cl("N0_0e", "ct", "ce")[1]),
+            "ee": jnp.array(corrections.get_ell_cl("N0_ee", "ce", "ce")[1]),
+            "bb": jnp.array(corrections.get_ell_cl("N0_bb", "cb", "cb")[1]),
+        }
+        self.n1_response = {
+            "tt": jnp.array(corrections.get_ell_cl("N1_00", "ct", "ct")[1]),
+            "te": jnp.array(corrections.get_ell_cl("N1_0e", "ct", "ce")[1]),
+            "ee": jnp.array(corrections.get_ell_cl("N1_ee", "ce", "ce")[1]),
+            "bb": jnp.array(corrections.get_ell_cl("N1_bb", "cb", "cb")[1]),
+        }
+        self.n1_clpp = jnp.array(corrections.get_ell_cl("N1_00", "cp", "cp")[1])
+        self.n0 = jnp.array(corrections.get_ell_cl("N0_00", "n0", "n0")[1][0])
+
+    def get_corrections(self, cltt, clte, clee, clbb, clkk, theta):
+        # Correction = 
+        # 2 (fiducial_kk - obs_kk) / n0
+        cls = {
+            "tt": cltt[self.ells],
+            "te": clte[self.ells],
+            "ee": clee[self.ells],
+            "bb": clbb[self.ells],
+            "kk": clkk[self.ells]
+        }
+        delta = {s: cls[s] - self.fiducial[s] for s in self.fiducial}
+        n0 = sum([self.n0_response[s] @ delta[s] for s in self.n0_response])
+        n1 = self.n1_clpp @ (cls["kk"] - self.fiducial["kk"]) \
+             + sum([self.n1_response[s] @ delta[s] for s in self.n1_response])
+
+        return 2. * (self.fiducial["kk"] / self.n0) * n0 + n1
