@@ -1,0 +1,32 @@
+[project]
+name = "MFLike-JAX"
+version = "2026"
+description = "JAX implementations of Simons Observatory CMB Likelihoods."
+readme = "README.md"
+license = "CC-BY-4.0"
+
+dependencies = [
+	"numpy",
+	"scipy",
+	"astropy",
+	"cobaya",
+	"jax",
+	"sacc"
+]
+
+authors = [
+	{name = "Hidde T. Jense", email="jenseh@cardiff.ac.uk"},
+]
+maintainers = [
+	{name = "Hidde T. Jense", email="jenseh@cardiff.ac.uk"},
+]
+
+classifiers = [
+	"Development Status :: 4 - Beta",
+	"Intended Audience :: Science/Research",
+	"Programming Language :: Python 3",
+	"Topic :: Scientific/Engineering :: Astronomy"
+]
+
+[tool.setuptools.packages.find]
+where = ["mflike_jax"]

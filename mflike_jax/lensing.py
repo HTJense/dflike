@@ -22,18 +22,39 @@ class Lensing_jax:
         if not os.path.isdir(data_path):
             data_path = os.path.join(resolve_packages_path(), "data", self.config["data_folder"])
         data = sacc.Sacc.load_fits(os.path.join(data_path, self.config["data_file"]))
-        fiducial = sacc.Sacc.load_fits(os.path.join(data_path, self.config["fiducial_file"]))
-        corrections = sacc.Sacc.load_fits(os.path.join(data_path, self.config["corrections_file"]))
-
-        print("data", data.get_tracer_combinations())
-        print("fiducial", fiducial.get_tracer_combinations())
-        print("corrections", corrections.get_tracer_combinations())
 
         self.parameters = []
+        _, cl, ind = data.get_ell_cl("cl_00", "ck", "ck", return_cov=False, return_ind=True)
+        self.data_vec = jnp.array(cl)
+        bpw = data.get_bandpower_windows(ind)
+        self.ells = jnp.array(bpw.values)
+        self.lmax = int(self.ells.max())
+        self.binning_matrix = jnp.array(bpw.weight.T)
+        self.covmat = jnp.array(data.covariance.covmat[:,:])
+        self.inv_cov = jnp.linalg.inv(self.covmat)
 
-    @partial(jax.jit, static_argnums=(0,))
-    def chisquare(self):
-        return 0.0
+    #@partial(jax.jit, static_argnums=(0,))
+    def bin_spectra(self, dlkk):
+        model_vec = self.binning_matrix @ dlkk
+        return model_vec
+
+    #@partial(jax.jit, static_argnums=(0,))
+    def get_unbinned_model(self, clpp, corrections, theta):
+        dlkk = clpp[self.ells] * (self.ells * (self.ells + 1.)) ** 2. / 4.
+        return dlkk + corrections
+
+    #@partial(jax.jit, static_argnums=(0,))
+    def get_model(self, clpp, corrections, theta):
+        model = self.get_unbinned_model(clpp, corrections, theta)
+        return self.bin_spectra(model)
+
+    #@partial(jax.jit, static_argnums=(0,))
+    def chisquare(self, clpp, corrections, theta):
+        model_vec = self.get_model(clpp, corrections, theta)
+        delta = model_vec - self.data_vec
+        chi2 = delta @ self.inv_cov @ delta
+
+        return chi2
 
 
 def get_cobaya_class():
