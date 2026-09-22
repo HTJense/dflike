@@ -3,6 +3,7 @@
 """
 from . import likelihood as like
 from . import bandpower_foregrounds as fg
+from . import lensing
 from cobaya.likelihood import Likelihood
 import numpy as np
 
@@ -31,5 +32,27 @@ class MFLike_jax_cobaya(Likelihood):
                                    theta_like)
 
         self.log.debug(f"Chi square = {chi2:.2f}")
+
+        return float(-chi2 / 2.)
+
+
+class Lensing_jax_cobaya(Likelihood):
+    config_file: str = None
+
+    def initialize(self):
+        self.like = lensing.Lensing_jax(self.config_file)
+
+    def get_requirements(self):
+        reqs = {}
+
+        for par in self.like.parameters:
+            reqs[par] = None
+
+        return reqs
+
+    def logp(self, **params):
+        chi2 = self.like.chisquare()
+
+        self.log.debuf(f"Chi square = {chi2:.2f}")
 
         return float(-chi2 / 2.)
