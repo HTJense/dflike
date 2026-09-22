@@ -66,7 +66,7 @@ class LensingCorrections:
         self.kk_factor = 2. * np.pi / 4.
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_corrections(self, dltt, dlte, dlee, dlbb, dlpp, theta):
+    def get_corrections(self, dltt, dlte, dlee, dlbb, dlpp, theta=None):
         cls = {
             "tt": dltt[self.ells] * self.dl_factor,
             "te": dlte[self.ells] * self.dl_factor,

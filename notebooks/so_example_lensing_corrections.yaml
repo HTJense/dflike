@@ -1,0 +1,3 @@
+data_folder: data/lensing
+fiducial_file: fiducial_lensing.sacc.fits
+corrections_file: corrections_lensing.sacc.fits
