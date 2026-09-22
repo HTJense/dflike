@@ -10,8 +10,8 @@ from typing import Optional
 
 
 class MFLike_jax_cobaya(Likelihood):
-    like_config_file: Optional[str | dict] = None
-    fg_config_file: Optional[str | dict] = None
+    like_config_file: str | dict
+    fg_config_file: str | dict
 
     def initialize(self):
         self.like = like.MFLike_jax(self.like_config_file)
@@ -38,14 +38,15 @@ class MFLike_jax_cobaya(Likelihood):
 
 
 class Lensing_jax_cobaya(Likelihood):
-    config_file: Optional[str | dict] = None
+    config_file: str | dict
     corr_config_file: Optional[str | dict] = None
 
     def initialize(self):
         self.like = lensing.Lensing_jax(self.config_file)
-        self.theory = lensing_corrections.LensingCorrections(
-            self.corr_config_file
-        )
+        if self.corr_config_file is not None:
+            self.theory = lensing_corrections.LensingCorrections(
+                self.corr_config_file
+            )
 
     def get_requirements(self):
         reqs = {}
@@ -57,8 +58,11 @@ class Lensing_jax_cobaya(Likelihood):
 
     def logp(self, **params):
         cl = self.provider.get_Cl(ell_factor=True)
-        theta_th = np.array([params[k] for k in self.theory.parameters])
-        corr = self.theory.get_corrections(theta_th)
+        
+        corr = None
+        if self.theory is not None:
+            theta_th = np.array([params[k] for k in self.theory.parameters])
+            corr = self.theory.get_corrections(theta_th)
 
         theta_like = np.array([params[k] for k in self.like.parameters])
         chi2 = self.like.chisquare(cl["pp"], corr, theta_like)
