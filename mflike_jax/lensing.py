@@ -39,18 +39,18 @@ class Lensing_jax:
         return model_vec
 
     #@partial(jax.jit, static_argnums=(0,))
-    def get_unbinned_model(self, clpp, corrections, theta):
-        dlkk = clpp[self.ells] * (self.ells * (self.ells + 1.)) ** 2. / 4.
+    def get_unbinned_model(self, dlpp, corrections, theta):
+        dlkk = 2. * np.pi * dlpp[self.ells] / 4.
         return dlkk + corrections
 
     #@partial(jax.jit, static_argnums=(0,))
-    def get_model(self, clpp, corrections, theta):
-        model = self.get_unbinned_model(clpp, corrections, theta)
+    def get_model(self, dlpp, corrections, theta):
+        model = self.get_unbinned_model(dlpp, corrections, theta)
         return self.bin_spectra(model)
 
     #@partial(jax.jit, static_argnums=(0,))
-    def chisquare(self, clpp, corrections, theta):
-        model_vec = self.get_model(clpp, corrections, theta)
+    def chisquare(self, dlpp, corrections, theta):
+        model_vec = self.get_model(dlpp, corrections, theta)
         delta = model_vec - self.data_vec
         chi2 = delta @ self.inv_cov @ delta
 

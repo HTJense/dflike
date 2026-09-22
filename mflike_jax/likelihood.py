@@ -18,8 +18,10 @@ class MFLike_jax:
             raise TypeError("Configuration should be string (filename) or "
                             f"dictionary, but was given {type(config)}.")
 
-        data_path = os.path.join(resolve_packages_path(), "data",
-                                 self.config["data_folder"])
+        data_path = self.config["data_folder"]
+        if not os.path.isdir(data_path):
+            data_path = os.path.join(resolve_packages_path(), "data",
+                                     self.config["data_folder"])
         s = sacc.Sacc.load_fits(os.path.join(data_path,
                                              self.config["input_file"]))
 

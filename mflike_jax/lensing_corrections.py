@@ -48,15 +48,23 @@ class LensingCorrections:
         self.n1_clpp = jnp.array(corrections.get_ell_cl("N1_00", "cp", "cp")[1])
         self.n0 = jnp.array(corrections.get_ell_cl("N0_00", "n0", "n0")[1][0])
 
-    def get_corrections(self, cltt, clte, clee, clbb, clkk, theta):
+        # The likelihood has C_ell data, so we need some
+        # D_ell -> C_ell conversion factors.
+        self.dl_factor = jnp.zeros(self.ells.shape)
+        self.dl_factor = self.dl_factor.at[self.ells > 0].set(
+            (2. * np.pi / (self.ells * (self.ells + 1.)))[self.ells > 0]
+        )
+        self.kk_factor = 2. * np.pi / 4.
+
+    def get_corrections(self, dltt, dlte, dlee, dlbb, dlpp, theta):
         # Correction = 
         # 2 (fiducial_kk - obs_kk) / n0
         cls = {
-            "tt": cltt[self.ells],
-            "te": clte[self.ells],
-            "ee": clee[self.ells],
-            "bb": clbb[self.ells],
-            "kk": clkk[self.ells]
+            "tt": dltt[self.ells] * self.dl_factor,
+            "te": dlte[self.ells] * self.dl_factor,
+            "ee": dlee[self.ells] * self.dl_factor,
+            "bb": dlbb[self.ells] * self.dl_factor,
+            "kk": dlpp[self.ells] * self.kk_factor,
         }
         delta = {s: cls[s] - self.fiducial[s] for s in self.fiducial}
         n0 = sum([self.n0_response[s] @ delta[s] for s in self.n0_response])

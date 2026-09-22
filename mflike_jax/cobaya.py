@@ -54,7 +54,7 @@ class Lensing_jax_cobaya(Likelihood):
         return reqs
 
     def logp(self, **params):
-        cl = self.provider.get_Cl(ell_factor=False)
+        cl = self.provider.get_Cl(ell_factor=True)
         theta_th = np.array([params[k] for k in self.theory.parameters])
         corr = self.theory.get_corrections(theta_th)
 
