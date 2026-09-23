@@ -24,6 +24,12 @@ class MFLike_jax:
                                      self.config["data_folder"])
         s = sacc.Sacc.load_fits(os.path.join(data_path,
                                              self.config["input_file"]))
+        
+        if self.config.get("cov_Bbl_file", None) is None:
+            t = s
+        else:
+            t = sacc.Sacc.load_fits(os.path.join(data_path,
+                                                 self.config["cov_Bbl_file"]))
 
         defaults = self.config["defaults"]
 
@@ -72,7 +78,7 @@ class MFLike_jax:
                 m = np.logical_and(ell > lmin, ell < lmax)
                 data_indices += list(ind[m])
                 data_vec += list(cl[m])
-                bpw = s.get_bandpower_windows(ind)
+                bpw = t.get_bandpower_windows(ind)
 
                 x1, x2 = ((ex2, ex1) if xy == "ET" else (ex1, ex2))
 
@@ -95,7 +101,7 @@ class MFLike_jax:
         self.data_vec = jnp.asarray(data_vec)
         data_indices = np.array(data_indices)
 
-        self.covmat = s.covariance.covmat[data_indices, :][:, data_indices]
+        self.covmat = t.covariance.covmat[data_indices, :][:, data_indices]
         self.inv_cov = jnp.asarray(np.linalg.inv(self.covmat))
         self.logp_const = -0.5 * (
             np.log(2. * np.pi) * len(self.data_vec)
