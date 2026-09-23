@@ -112,7 +112,7 @@ def newton_raphson_multi(func, x0, n_steps, param_ranges=None, alpha0=1.0,
     return chains
 
 
-def emulators_to_jax(parser):
+def emulators_to_jax(parser, desired=["tt", "te", "ee"]):
     """
         Convert the Cl emulators found in a Cosmopower.YAMLParser into
         ComsmoPower_JAX emulators.
@@ -121,66 +121,39 @@ def emulators_to_jax(parser):
 
     emulators = parser.restore_networks()
 
-    # I apologize for this code,
-    # But the high-accuracy emulators created for cosmopower are not compatible
-    # with cosmopower-jax
-    # So we have to manually convert them into the right format...
-    # TT
-    cmb_tt = CosmoPowerJAX("cmb_tt")
-    cmb_tt.n_parameters = emulators["Cl/tt"].n_parameters
-    cmb_tt.parameters = [str(x) for x in emulators["Cl/tt"].parameters]
-    cmb_tt.param_train_mean = emulators["Cl/tt"].parameters_mean.numpy()
-    cmb_tt.param_train_std = emulators["Cl/tt"].parameters_std.numpy()
-    cmb_tt.feature_train_mean = emulators["Cl/tt"].features_mean.numpy()
-    cmb_tt.feature_train_std = emulators["Cl/tt"].features_std.numpy()
-    cmb_tt.modes = emulators["Cl/tt"].modes
+    results = {}
 
-    weights = [w.numpy().T for w in emulators["Cl/tt"].W]
-    biases = [b.numpy() for b in emulators["Cl/tt"].b]
-    alphas = [a.numpy() for a in emulators["Cl/tt"].alphas]
-    betas = [b.numpy() for b in emulators["Cl/tt"].betas]
+    for xy in desired:
+        emu = CosmoPowerJAX(f"cmb_{xy}")
+        emu.n_parameters = emulators[f"Cl/{xy}"].n_parameters
+        emu.parameters = [str(x) for x in emulators[f"Cl/{xy}"].parameters]
+        emu.modes = emulators[f"Cl/{xy}"].modes
 
-    cmb_tt.weights = list(zip(weights, biases))
-    cmb_tt.hyper_params = list(zip(alphas, betas))
+        weights = [w.numpy().T for w in emulators[f"Cl/{xy}"].W]
+        biases = [b.numpy() for b in emulators[f"Cl/{xy}"].b]
+        alphas = [a.numpy() for a in emulators[f"Cl/{xy}"].alphas]
+        betas = [b.numpy() for b in emulators[f"Cl/{xy}"].betas]
 
-    # TE
-    cmb_te = CosmoPowerJAX("cmb_te")
-    cmb_te.n_parameters = emulators["Cl/te"].n_parameters
-    cmb_te.parameters = [str(x) for x in emulators["Cl/te"].parameters]
-    cmb_te.n_pcas = emulators["Cl/te"].n_pcas
-    cmb_te.pca_matrix = emulators["Cl/te"].pca_transform_matrix_
-    cmb_te.param_train_mean = emulators["Cl/te"].parameters_mean_
-    cmb_te.param_train_std = emulators["Cl/te"].parameters_std_
-    cmb_te.feature_train_mean = emulators["Cl/te"].pca_mean_
-    cmb_te.feature_train_std = emulators["Cl/te"].pca_std_
-    cmb_te.training_mean = emulators["Cl/te"].features_mean_
-    cmb_te.training_std = emulators["Cl/te"].features_std_
-    cmb_te.modes = emulators["Cl/te"].modes
+        emu.weights = list(zip(weights, biases))
+        emu.hyper_params = list(zip(alphas, betas))
 
-    weights = [w.numpy().T for w in emulators["Cl/te"].W]
-    biases = [b.numpy() for b in emulators["Cl/te"].b]
-    alphas = [a.numpy() for a in emulators["Cl/te"].alphas]
-    betas = [b.numpy() for b in emulators["Cl/te"].betas]
+        if hasattr(emulators[f"Cl/{xy}"], "n_pcas"):
+            # PCA data.
+            emu.n_pcas = emulators[f"Cl/{xy}"].n_pcas
+            emu.pca_matrix = emulators[f"Cl/{xy}"].pca_transform_matrix_
+            emu.param_train_mean = emulators[f"Cl/{xy}"].parameters_mean_
+            emu.param_train_std = emulators[f"Cl/{xy}"].parameters_std_
+            emu.feature_train_mean = emulators[f"Cl/{xy}"].pca_mean_
+            emu.feature_train_std = emulators[f"Cl/{xy}"].pca_std_
+            emu.training_mean = emulators[f"Cl/{xy}"].features_mean_
+            emu.training_std = emulators[f"Cl/{xy}"].features_std_
+        else:
+            # Non-PCA data.
+            emu.param_train_mean = emulators[f"Cl/{xy}"].parameters_mean.numpy()  # noqa: E501
+            emu.param_train_std = emulators[f"Cl/{xy}"].parameters_std.numpy()
+            emu.feature_train_mean = emulators[f"Cl/{xy}"].features_mean.numpy()  # noqa: E501
+            emu.feature_train_std = emulators[f"Cl/{xy}"].features_std.numpy()
 
-    cmb_te.weights = list(zip(weights, biases))
-    cmb_te.hyper_params = list(zip(alphas, betas))
+        results[xy] = emu
 
-    # EE
-    cmb_ee = CosmoPowerJAX("cmb_ee")
-    cmb_ee.n_parameters = emulators["Cl/ee"].n_parameters
-    cmb_ee.parameters = [str(x) for x in emulators["Cl/ee"].parameters]
-    cmb_ee.param_train_mean = emulators["Cl/ee"].parameters_mean.numpy()
-    cmb_ee.param_train_std = emulators["Cl/ee"].parameters_std.numpy()
-    cmb_ee.feature_train_mean = emulators["Cl/ee"].features_mean.numpy()
-    cmb_ee.feature_train_std = emulators["Cl/ee"].features_std.numpy()
-    cmb_ee.modes = emulators["Cl/ee"].modes
-
-    weights = [w.numpy().T for w in emulators["Cl/ee"].W]
-    biases = [b.numpy() for b in emulators["Cl/ee"].b]
-    alphas = [a.numpy() for a in emulators["Cl/ee"].alphas]
-    betas = [b.numpy() for b in emulators["Cl/ee"].betas]
-
-    cmb_ee.weights = list(zip(weights, biases))
-    cmb_ee.hyper_params = list(zip(alphas, betas))
-
-    return cmb_tt, cmb_te, cmb_ee
+    return results

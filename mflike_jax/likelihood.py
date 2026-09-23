@@ -18,8 +18,10 @@ class MFLike_jax:
             raise TypeError("Configuration should be string (filename) or "
                             f"dictionary, but was given {type(config)}.")
 
-        data_path = os.path.join(resolve_packages_path(), "data",
-                                 self.config["data_folder"])
+        data_path = self.config["data_folder"]
+        if not os.path.isdir(data_path):
+            data_path = os.path.join(resolve_packages_path(), "data",
+                                     self.config["data_folder"])
         s = sacc.Sacc.load_fits(os.path.join(data_path,
                                              self.config["input_file"]))
 
@@ -95,7 +97,10 @@ class MFLike_jax:
 
         self.covmat = s.covariance.covmat[data_indices, :][:, data_indices]
         self.inv_cov = jnp.asarray(np.linalg.inv(self.covmat))
-        self.logp_const = -0.5 * (np.log(2. * np.pi) * len(self.data_vec) + np.linalg.slogdet(self.inv_cov)[1])
+        self.logp_const = -0.5 * (
+            np.log(2. * np.pi) * len(self.data_vec)
+            + np.linalg.slogdet(self.inv_cov)[1]
+        )
 
     @partial(jax.jit, static_argnums=(0,))
     def bin_spectra(self, spec):
