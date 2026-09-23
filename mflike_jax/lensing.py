@@ -35,6 +35,10 @@ class Lensing_jax:
         self.binning_matrix = jnp.array(bpw.weight.T)
         self.covmat = jnp.array(data.covariance.covmat[:, :])
         self.inv_cov = jnp.linalg.inv(self.covmat)
+        self.logp_const = -0.5 * (
+            np.log(2. * np.pi) * len(self.data_vec)
+            + np.linalg.slogdet(self.inv_cov)[1]
+        )
 
     @partial(jax.jit, static_argnums=(0,))
     def bin_spectra(self, dlkk):
@@ -60,6 +64,11 @@ class Lensing_jax:
         chi2 = delta @ self.inv_cov @ delta
 
         return chi2
+
+    @partial(jax.jit, static_argnums=(0,))
+    def loglike(self, dlpp, corrections=None, theta=None):
+        chi2 = self.chisquare(dlpp, corrections, theta)
+        return -0.5 * chi2 + self.logp_const
 
 
 def get_cobaya_class():
