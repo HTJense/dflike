@@ -57,16 +57,10 @@ class Lensing_jax_cobaya(Likelihood):
 
     def logp(self, **params):
         cl = self.provider.get_Cl(ell_factor=True)
-<<<<<<< HEAD
-
         corr = None
         if self.theory is not None:
             theta_th = np.array([params[k] for k in self.theory.parameters])
             corr = self.theory.get_corrections(theta_th)
-=======
-        theta_th = np.array([params[k] for k in self.theory.parameters])
-        corr = self.theory.get_corrections(theta_th)
->>>>>>> parent of 64211d2 (Made lensing corrections optional.)
 
         theta_like = np.array([params[k] for k in self.like.parameters])
         chi2 = self.like.chisquare(cl["pp"], corr, theta_like)

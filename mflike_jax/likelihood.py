@@ -166,3 +166,39 @@ class MFLike_jax:
     def loglike(self, dltt, dlte, dlee, foregrounds, theta):
         chi2 = self.chisquare(dltt, dlte, dlee, foregrounds, theta)
         return -0.5 * chi2 + self.logp_const
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def design_matrix(self, theta, n_ig=0):
+        nb = {}
+        # Count the number of bins per extracted cross-spectrum.
+        for m in self.spec_meta:
+            dt = m["dt"]
+            nb[dt] = max(nb.get(dt, 0), len(m["ids"]) - n_ig)
+        b = 0
+        b0 = {}
+        # Find the zero-point offset per spectrum.
+        for dt in nb:
+            b0[dt] = b
+            b += nb[dt]
+        M = jnp.zeros((len(self.data_vec), sum(nb.values())))
+
+        # Start filling out the design matrix.
+        for m in self.spec_meta:
+            dt = m["dt"]
+            x1, x2 = m["exp1"], m["exp2"]
+            ids = m["ids"]
+            calG = theta[0]
+            calT1 = theta[self.parameters.index(f"cal_{x1}")]
+            calT2 = theta[self.parameters.index(f"cal_{x2}")]
+            calE1 = theta[self.parameters.index(f"calE_{x1}")]
+            calE2 = theta[self.parameters.index(f"calE_{x2}")]
+            cal = 1. / (calG ** 2. * calT1 * calT2)
+            if dt == "cal_0e":
+                cal /= calE2
+            if dt == "cal_ee":
+                cal /= (calE1 * calE2)
+
+            b = b0[dt] + np.arange(nb[dt] - len(ids) + n_ig, nb[dt])
+            M = M.at[ids[:-n_ig], b].set(cal)
+
+        return M
