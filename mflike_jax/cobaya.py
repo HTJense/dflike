@@ -72,7 +72,6 @@ class Lensing_jax_cobaya(Likelihood):
             for par in self.theory.parameters:
                 reqs[par] = None
 
-
         return reqs
 
     def logp(self, **params):
