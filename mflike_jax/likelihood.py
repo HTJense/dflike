@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+import jax
 import jax.numpy as jnp
 import jax.scipy as jsc
 
@@ -6,6 +7,10 @@ import jax.scipy as jsc
 class Likelihood(ABC):
     @abstractmethod
     def loglike(self, theta, **kwargs):
+        ...
+
+    @abstractmethod
+    def fisher(self, theta, **kwargs):
         ...
 
 
@@ -37,3 +42,10 @@ class GaussianLikelihood(Likelihood):
     def chisquare(self, theta, **kwargs):
         w = self.get_whitened_residual(theta, **kwargs)
         return jnp.sum(w ** 2)
+
+    def fisher(self, theta, **kwargs):
+        J = jax.jacfwd(lambda x: self.get_model(x, **kwargs))(theta)
+        L = self.get_covariance_cholesky(theta, **kwargs)
+        W = jsc.linalg.solve_triangular(L, J, lower=True)
+
+        return W.T @ W

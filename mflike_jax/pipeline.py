@@ -1,6 +1,8 @@
-from jax import numpy as jnp
+import jax
+import jax.numpy as jnp
+import jax.scipy as jsc
 from .theory import Theory
-from .likelihood import Likelihood
+from .likelihood import Likelihood, GaussianLikelihood
 
 
 class Pipeline:
@@ -28,7 +30,7 @@ class Pipeline:
             ]) for like in self.likelihoods
         ]
 
-    def logposterior(self, theta: jnp.ndarray) -> float:
+    def compute(self, theta: jnp.ndarray) -> dict:
         products = {}
         left_to_compute = list(enumerate(self.theories))
         while len(left_to_compute) > 0:
@@ -45,9 +47,35 @@ class Pipeline:
                 raise RuntimeError("Failed to compute everything - "
                                    "Did you check your theory dependencies?")
 
+        return products
+
+    def logposterior(self, theta: jnp.ndarray) -> float:
+        products = self.compute(theta)
+
         logp = jnp.sum(jnp.array([
             like.loglike(theta[idx], **products)
             for idx, like in zip(self.like_indices, self.likelihoods)
         ]))
 
         return logp
+
+    def fisher(self, theta: jnp.ndarray) -> jnp.ndarray:
+        F = jnp.zeros((theta.size, theta.size))
+        products = self.compute(theta)
+
+        for idx, like in zip(self.like_indices, self.likelihoods):
+            if isinstance(like, GaussianLikelihood):
+                def model(x):
+                    products = self.compute(x)
+                    return like.get_model(x[idx], **products)
+
+                J = jax.jacfwd(model)(theta)
+                L = like.get_covariance_cholesky(theta[idx], **products)
+                W = jsc.linalg.solve_triangular(L, J, lower=True)
+
+                F = F + W.T @ W
+            else:
+                F_like = like.fisher(theta[idx], **products)
+                F.at[jnp.ix_(idx,idx)].add(F_like)
+
+        return F
