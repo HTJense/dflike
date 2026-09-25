@@ -33,6 +33,7 @@ class LensingCorrections:
         self.ells = jnp.array(
             fiducial.get_ell_cl(None, "ct", "ct")[0].astype(int)
         )
+        self.lmax = int(self.ells.max())
         self.fiducial = {
             "tt": jnp.array(fiducial.get_ell_cl(None, "ct", "ct")[1]),
             "te": jnp.array(fiducial.get_ell_cl(None, "ct", "ce")[1]),
@@ -64,15 +65,16 @@ class LensingCorrections:
             (2. * np.pi / (self.ells * (self.ells + 1.)))[self.ells > 0]
         )
         self.kk_factor = 2. * np.pi / 4.
+        self.parameters = []
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_corrections(self, dltt, dlte, dlee, dlbb, dlpp, theta=None):
+    def get_corrections(self, cls, theta=None):
         cls = {
-            "tt": dltt[self.ells] * self.dl_factor,
-            "te": dlte[self.ells] * self.dl_factor,
-            "ee": dlee[self.ells] * self.dl_factor,
-            "bb": dlbb[self.ells] * self.dl_factor,
-            "kk": dlpp[self.ells] * self.kk_factor,
+            "tt": cls["tt"][self.ells] * self.dl_factor,
+            "te": cls["te"][self.ells] * self.dl_factor,
+            "ee": cls["ee"][self.ells] * self.dl_factor,
+            "bb": cls["bb"][self.ells] * self.dl_factor,
+            "kk": cls["pp"][self.ells] * self.kk_factor,
         }
         delta = {s: cls[s] - self.fiducial[s] for s in self.fiducial}
         n0 = sum([self.n0_response[s] @ delta[s] for s in self.n0_response])
