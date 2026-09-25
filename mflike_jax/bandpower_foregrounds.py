@@ -1,9 +1,10 @@
 import numpy as np
-from functools import partial
 import jax
 import jax.numpy as jnp
 from cobaya.yaml import yaml_load_file
 from scipy import constants
+
+from .theory import Theory
 
 from . import fg_model as fgm
 from . import fg_power as fgp
@@ -18,7 +19,7 @@ def _cmb2bb(nu, T=T_CMB):
     return jnp.exp(x) * (nu * x / jnp.expm1(x)) ** 2.
 
 
-class BandpowerForegrounds:
+class BandpowerForegrounds(Theory):
     def __init__(self, config: str | dict, likelihood, lmax: int = 9000):
         if type(config) is str:
             self.config = yaml_load_file(config)
@@ -140,7 +141,6 @@ class BandpowerForegrounds:
 
             self.fg_indices[cl] = cl_indices
 
-    @partial(jax.jit, static_argnums=(0,))
     def apply_bandpass_shifts(self, bandint_theta):
         nus = []
         bps = []
@@ -159,7 +159,6 @@ class BandpowerForegrounds:
 
         return nus, bps
 
-    @partial(jax.jit, static_argnums=(0,))
     def get_foreground_model(self, theta):
         nu, bp = self.apply_bandpass_shifts(theta[self.bp_index])
 
@@ -175,3 +174,14 @@ class BandpowerForegrounds:
                                                      theta_fg)
 
         return jnp.stack(foregrounds)
+
+    def compute(self, theta, **kwargs):
+        return {"foregrounds": self.get_foreground_model(theta)}
+
+    @property
+    def inputs(self):
+        return ()
+
+    @property
+    def outputs(self):
+        return ("foregrounds",)
