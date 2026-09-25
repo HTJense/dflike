@@ -159,7 +159,7 @@ class BandpowerForegrounds(Theory):
 
         return nus, bps
 
-    def compute(self, theta, **kwargs):
+    def get_foreground_model(self, theta):
         nu, bp = self.apply_bandpass_shifts(theta[self.bp_index])
 
         foregrounds = [jnp.zeros((*self.ells.shape, len(self.experiments),
@@ -173,7 +173,10 @@ class BandpowerForegrounds(Theory):
                 foregrounds[i] = foregrounds[i] + fg(self.ells, nu, bp,
                                                      theta_fg)
 
-        return {"foregrounds": jnp.stack(foregrounds)}
+        return jnp.stack(foregrounds)
+
+    def compute(self, theta, **kwargs):
+        return {"foregrounds": self.get_foreground_model(theta)}
 
     @property
     def inputs(self):

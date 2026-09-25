@@ -95,8 +95,8 @@ class MFLike_jax(GaussianLikelihood):
                 dt = MFLIKE_DATA_TYPES[xy.lower()]
                 spec = self.requested_cls.index(NORMALIZE_SPECTRA[xy.lower()])
 
-                t1 = ex1 + ("_s0" if xy[0] == "t" else "_s2")
-                t2 = ex2 + ("_s0" if xy[1] == "t" else "_s2")
+                t1 = ex1 + ("_s0" if xy[0].lower() == "t" else "_s2")
+                t2 = ex2 + ("_s0" if xy[1].lower() == "t" else "_s2")
                 lmin, lmax = entry["scales"][xy.upper()]
 
                 ell, cl, ind = s.get_ell_cl(dt, t1, t2, return_ind=True)
