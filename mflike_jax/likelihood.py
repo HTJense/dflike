@@ -72,8 +72,9 @@ class MFLike_jax:
 
         data_vec = []
         data_indices = []
+        self.lmax = defaults["lmax"]
         self.spec_meta = []
-        self.ells = jnp.arange(2, defaults["lmax"]+1)
+        self.ells = jnp.arange(2, self.lmax+1)
         i0 = 0
 
         self.parameters = ["calG_all"]
