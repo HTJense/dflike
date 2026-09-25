@@ -8,6 +8,31 @@ from cobaya.yaml import yaml_load_file
 from cobaya.tools import resolve_packages_path
 
 
+NORMALIZE_SPECTRA = {
+    "tt": "tt",
+    "te": "te",
+    "tb": "tb",
+    "et": "te",
+    "ee": "ee",
+    "eb": "eb",
+    "bt": "tb",
+    "be": "eb",
+    "bb": "bb"
+}
+
+MFLIKE_DATA_TYPES = {
+    "tt": "cl_00",
+    "te": "cl_0e",
+    "et": "cl_0e",
+    "tb": "cl_0b",
+    "bt": "cl_0b",
+    "ee": "cl_ee",
+    "eb": "cl_eb",
+    "be": "cl_eb",
+    "bb": "cl_bb"
+}
+
+
 class MFLike_jax:
     def __init__(self, config: str | dict):
         if type(config) is str:
@@ -31,6 +56,9 @@ class MFLike_jax:
             t = sacc.Sacc.load_fits(os.path.join(data_path,
                                                  self.config["cov_Bbl_file"]))
 
+        self.requested_cls = [
+            xy.lower() for xy in self.config["requested_cls"]
+        ]
         defaults = self.config["defaults"]
 
         self.experiments = self.config["data"]["experiments"]
@@ -62,17 +90,13 @@ class MFLike_jax:
 
         for entry in self.config["data"]["spectra"]:
             ex1, ex2 = entry["experiments"]
-            for xy in entry.get("polarizations", defaults["polarizations"]):
-                dt = {
-                    "TT": "cl_00",
-                    "TE": "cl_0e",
-                    "ET": "cl_0e",
-                    "EE": "cl_ee"
-                }[xy]
-                spec = {"TT": 0, "TE": 1, "ET": 1, "EE": 2}[xy]
-                t1 = ex1 + ("_s0" if xy[0] == "T" else "_s2")
-                t2 = ex2 + ("_s0" if xy[1] == "T" else "_s2")
-                lmin, lmax = entry["scales"][xy]
+            for xy in map(lambda x: x.lower(), entry.get("polarizations", defaults["polarizations"])):
+                dt = MFLIKE_DATA_TYPES[xy]
+                spec = self.requested_cls.index(NORMALIZE_SPECTRA[xy])
+
+                t1 = ex1 + ("_s0" if xy[0] == "t" else "_s2")
+                t2 = ex2 + ("_s0" if xy[1] == "t" else "_s2")
+                lmin, lmax = entry["scales"][xy.upper()]
 
                 ell, cl, ind = s.get_ell_cl(dt, t1, t2, return_ind=True)
                 m = np.logical_and(ell > lmin, ell < lmax)
@@ -80,7 +104,9 @@ class MFLike_jax:
                 data_vec += list(cl[m])
                 bpw = t.get_bandpower_windows(ind)
 
-                x1, x2 = ((ex2, ex1) if xy == "ET" else (ex1, ex2))
+                x1, x2 = (
+                    (ex2, ex1) if xy in ["et", "bt", "be"] else (ex1, ex2)
+                )
 
                 self.spec_meta.append({
                     "dt": dt,
@@ -125,52 +151,57 @@ class MFLike_jax:
 
     @partial(jax.jit, static_argnums=(0,))
     def calibrate_spectra(self, spectra, theta):
-        """ spectra is a (3, ell, exp1, exp2) array
-            for each pair of (exp1, exp2), we divide the entry by
-            (cal_exp1 * cal_exp2,
-             cal_exp1 * cal_exp2 * calE_exp2,
-             cal_exp1 * calE_exp1 * cal_exp2 * calE_exp2)
-            Refer to the `parameters` array to find the parameter names. """
+        """ spectra is a (xy, ell, exp1, exp2) array
+            for each pair of (exp1, exp2), we divide the entry by the
+            respective calibration factor. """
         calG = 1. / theta[0] ** 2.
         calT = 1. / theta[self.calT_index]
         calE = 1. / (theta[self.calT_index] * theta[self.calE_index])
 
-        calTT = calT[:, None] * calT[None, :]
-        calTE = calT[:, None] * calE[None, :]
-        calEE = calE[:, None] * calE[None, :]
+        res = []
+        for i, xy in enumerate(self.requested_cls):
+            cal = calG
+            if xy[0] == "t":
+                cal *= calT[:,None]
+            else:
+                cal *= calE[:,None]
+            if xy[1] == "t":
+                cal *= calT[None,:]
+            else:
+                cal *= calE[None,:]
 
-        return jnp.stack([
-            spectra[0] * calG * calTT,
-            spectra[1] * calG * calTE,
-            spectra[2] * calG * calEE,
-        ])
+            res.append(spectra[i] * cal)
+
+        return jnp.stack(res)
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_unbinned_model(self, dltt, dlte, dlee, foregrounds, theta):
-        """ Project (TT,TE,EE) from (3, ell) to (3, ell, exp1, exp2) and add
+    def get_unbinned_model(self, cls, foregrounds, theta):
+        """ Project (cls) from (xy, ell) to (xy, ell, exp1, exp2) and add
             foregrounds."""
-        spec = jnp.stack([dltt[self.ells], dlte[self.ells], dlee[self.ells]])
+        spec = jnp.stack([
+            cls[xy][self.ells] for xy in self.requested_cls
+        ])
         spec = (jnp.broadcast_to(spec[:, :, None, None], foregrounds.shape)
                 + foregrounds)
 
         return self.calibrate_spectra(spec, theta)
 
     @partial(jax.jit, static_argnums=(0,))
-    def get_model(self, dltt, dlte, dlee, foregrounds, theta):
+    def get_model(self, cls, foregrounds, theta):
         """ Get the binned data model. """
-        model = self.get_unbinned_model(dltt, dlte, dlee, foregrounds, theta)
+        model = self.get_unbinned_model(cls, foregrounds, theta)
         return self.bin_spectra(model)
 
     @partial(jax.jit, static_argnums=(0,))
-    def chisquare(self, dltt, dlte, dlee, foregrounds, theta):
-        model = self.get_model(dltt, dlte, dlee, foregrounds, theta)
+    def chisquare(self, cls, foregrounds, theta):
+        model = self.get_model(cls, foregrounds, theta)
         delta = self.data_vec - model
         chi2 = delta @ self.inv_cov @ delta
         return chi2
 
     @partial(jax.jit, static_argnums=(0,))
-    def loglike(self, dltt, dlte, dlee, foregrounds, theta):
-        chi2 = self.chisquare(dltt, dlte, dlee, foregrounds, theta)
+    def loglike(self, cls, foregrounds, theta):
+        chi2 = self.chisquare(cls, foregrounds, theta)
         return -0.5 * chi2 + self.logp_const
 
     @partial(jax.jit, static_argnums=(0, 2))
@@ -199,9 +230,9 @@ class MFLike_jax:
             calE1 = theta[self.parameters.index(f"calE_{x1}")]
             calE2 = theta[self.parameters.index(f"calE_{x2}")]
             cal = 1. / (calG ** 2. * calT1 * calT2)
-            if dt == "cal_0e":
+            if dt in ["cal_0e", "cal_0b"]:
                 cal /= calE2
-            if dt == "cal_ee":
+            if dt in ["cal_ee", "cal_eb", "cal_bb"]:
                 cal /= (calE1 * calE2)
 
             b = b0[dt] + np.arange(nb[dt] - len(ids) + n_ig, nb[dt])
