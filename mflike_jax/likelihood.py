@@ -5,6 +5,8 @@ import jax.scipy as jsc
 
 
 class Likelihood(ABC):
+    parameters: list[str]
+
     @abstractmethod
     def loglike(self, theta, **kwargs):
         ...
