@@ -6,9 +6,9 @@ T_CMB = 2.72548e6
 
 
 class Cosmopower(Theory):
-    def __init__(self, parser):
+    def __init__(self, parser, desired=["tt", "te", "ee"]):
         self.parameters = set([])
-        self.emulators = util.emulators_to_jax(parser)
+        self.emulators = util.emulators_to_jax(parser, desired=desired)
         for xy in self.emulators:
             self.parameters |= set(self.emulators[xy].parameters)
         self.parameters = list(self.parameters)
