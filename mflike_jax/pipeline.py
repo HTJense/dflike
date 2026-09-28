@@ -138,7 +138,7 @@ class Pipeline:
     def get_likelihood_models(self) -> list[Callable]:
         if self.models is None:
             self.models = []
-            
+
             for idx, like in zip(self.like_indices, self.likelihoods):
                 if isinstance(like, GaussianLikelihood):
                     def model(x):
@@ -176,10 +176,9 @@ class Pipeline:
         jac = self.get_jacobians()
 
         if self.prior is not None:
+            idx = self.prior_free_indices
             F_prior = self.prior.fisher(theta_full[self.prior_indices])
-            F = F.at[jnp.ix_(self.prior_free_indices,self.prior_free_indices)].add(
-                F_prior[jnp.ix_(self.prior_free_indices,self.prior_free_indices)]
-            )
+            F = F.at[jnp.ix_(idx, idx)].add(F_prior[jnp.ix_(idx, idx)])
 
         for idx, J, f_idx, like in zip(self.like_indices, jac,
                                        self.like_free_indices,
@@ -197,12 +196,15 @@ class Pipeline:
 
         return F
 
-    def minimize(self, theta_start: jnp.ndarray, max_steps: int, **kwargs) -> list[jnp.ndarray]:
+    def minimize(self, theta_start: jnp.ndarray, max_steps: int,
+                 **kwargs) -> list[jnp.ndarray]:
         # Find the best-fitting log-posterior.
         optimizer = optax.adam(**kwargs)
         state = optimizer.init(theta_start)
 
-        vgrad = jax.jit(jax.value_and_grad(lambda theta: -self.logposterior(theta)))
+        vgrad = jax.jit(jax.value_and_grad(
+            lambda theta: -self.logposterior(theta)
+        ))
 
         chain = [theta_start]
         theta = theta_start.copy()
