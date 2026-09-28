@@ -149,7 +149,7 @@ class Pipeline:
         """
         return self.logprior(theta) + self.loglike(theta)
 
-    def get_likelihood_models(self) -> list[Callable]:
+    def get_models(self) -> list[Callable]:
         if self.models is None:
             self.models = []
 
@@ -167,7 +167,7 @@ class Pipeline:
 
         return self.models
 
-    def get_likelihood_jacobians(self) -> list[Callable]:
+    def get_jacobians(self) -> list[Callable]:
         if self.jacobians is None:
             models = self.get_models()
             self.jacobians = []
