@@ -1,0 +1,60 @@
+# A cobaya likelihood for ACT DR6 data
+# see https://github.com/simonsobs/LAT_MFLike/blob/master/mflike/MFLike.yaml
+# for more details regarding section
+
+data_folder: ACTDR6CMBonly/v1.0
+
+input_file: dr6_data_cmbonly.fits
+
+requested_cls: ["tt", "te", "ee"]
+
+# Specify default set of spectra and scale cuts
+# to be used
+defaults:
+  symmetrize: false
+  polarizations: [TT, TE, EE]
+  lmax: &lmax 6500
+  scales:
+    TT: [2, *lmax]
+    TE: [2, *lmax]
+    ET: [2, *lmax]
+    EE: [2, *lmax]
+
+data:
+  experiments:
+    - dr6_cmb
+
+  spectra:
+    - experiments: [dr6_cmb, dr6_cmb]
+      polarizations: [TT, TE, EE]
+      scales:
+        TT: [600, *lmax]
+        TE: [600, *lmax]
+        EE: [600, *lmax]
+
+
+params:
+  calG:
+    prior:
+      dist: norm
+      loc: 1.0
+      scale: 0.003
+    ref:
+      dist: norm
+      loc: 1.0
+      scale: 0.003
+    proposal: 0.0015
+    latex: \mathrm{cal}_{\rm ACT}
+  calT:
+    value: 1.0
+    latex: \mathrm{c}_{\rm ACT,T}
+  calP:
+    prior:
+      min: 0.5
+      max: 1.5
+    ref:
+      dist: norm
+      loc: 1.0
+      scale: 0.01
+    proposal: 0.01
+    latex: \mathrm{p}_{\rm ACT}
