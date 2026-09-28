@@ -1,7 +1,7 @@
 """
-    Cobaya wrappers for mflike_jax.
+    Cobaya wrappers for DFLike.
 """
-from . import likelihood as like
+from . import cmb_like
 from . import bandpower_foregrounds as fg
 from . import lensing, lensing_corrections
 from cobaya.likelihood import Likelihood
@@ -9,12 +9,12 @@ import numpy as np
 from typing import Optional
 
 
-class MFLike_jax_cobaya(Likelihood):
+class MultiFrequency_cobaya(Likelihood):
     like_config_file: Optional[str | dict] = None
     fg_config_file: Optional[str | dict] = None
 
     def initialize(self):
-        self.like = like.MFLike_jax(self.like_config_file)
+        self.like = cmb_like.MultiFrequency(self.like_config_file)
         self.theory = fg.BandpowerForegrounds(self.fg_config_file, self.like)
 
     def get_requirements(self):
@@ -40,7 +40,7 @@ class MFLike_jax_cobaya(Likelihood):
         return float(-chi2 / 2.)
 
 
-class Lensing_jax_cobaya(Likelihood):
+class Lensing_cobaya(Likelihood):
     config_file: str | dict
     corr_config_file: Optional[str | dict] = None
 

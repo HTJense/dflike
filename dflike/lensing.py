@@ -58,8 +58,8 @@ class Lensing_jax(GaussianLikelihood):
 def get_cobaya_class():
     """
         This function allow one to import the lensing likelihood into cobaya
-        using as `mflike_jax.lensing`.
+        using as `dflike.lensing`.
     """
-    from .cobaya import Lensing_jax_cobaya
+    from .cobaya import Lensing_cobaya
 
-    return Lensing_jax_cobaya
+    return Lensing_cobaya

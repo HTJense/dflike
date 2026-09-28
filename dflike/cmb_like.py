@@ -33,7 +33,7 @@ MFLIKE_DATA_TYPES = {
 }
 
 
-class MFLike_jax(GaussianLikelihood):
+class MultiFrequency(GaussianLikelihood):
     def __init__(self, config: str | dict):
         if type(config) is str:
             self.config = yaml_load_file(config)
@@ -191,7 +191,7 @@ class MFLike_jax(GaussianLikelihood):
         model = self.get_unbinned_model(theta, cls, foregrounds)
         return self.bin_spectra(model)
 
-    def design_matrix(self, theta, n_ig=0):
+    def design_matrix(self, theta, n_ig=1):
         nb = {}
         # Count the number of bins per extracted cross-spectrum.
         for m in self.spec_meta:
