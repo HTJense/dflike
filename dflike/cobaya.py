@@ -45,7 +45,7 @@ class Lensing_cobaya(Likelihood):
     corr_config_file: Optional[str | dict] = None
 
     def initialize(self):
-        self.like = lensing.Lensing_jax(self.config_file)
+        self.like = lensing.Lensing(self.config_file)
         if self.corr_config_file is not None:
             self.theory = lensing_corrections.LensingCorrections(
                 self.corr_config_file
