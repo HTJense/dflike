@@ -48,6 +48,7 @@ class Pipeline:
         ]
 
         self.jacobians = None
+        self.models = None
 
     def restrict(self, theta_fixed: dict):
         self.parameters = self.parameters_full.copy()
@@ -77,6 +78,7 @@ class Pipeline:
 
         # Clear the Jacobians cache (they should be re-built).
         self.jacobians = None
+        self.models = None
 
     def expand(self, theta_free: jnp.ndarray) -> jnp.ndarray:
         if theta_free.shape == self.theta_default.shape:
@@ -133,10 +135,10 @@ class Pipeline:
         """
         return self.logprior(theta) + self.loglike(theta)
 
-    def get_jacobians(self) -> list[Callable]:
-        if self.jacobians is None:
-            self.jacobians = []
-
+    def get_likelihood_models(self) -> list[Callable]:
+        if self.models is None:
+            self.models = []
+            
             for idx, like in zip(self.like_indices, self.likelihoods):
                 if isinstance(like, GaussianLikelihood):
                     def model(x):
@@ -144,7 +146,22 @@ class Pipeline:
                         products = self.compute(x_f)
                         return like.get_model(x_f[idx], **products)
 
-                    self.jacobians.append(jax.jit(jax.jacfwd(model)))
+                    self.models.append(jax.jit(model))
+                else:
+                    # Doesn't necessarily exist.
+                    self.models.append(None)
+
+        return self.models
+
+    def get_likelihood_jacobians(self) -> list[Callable]:
+        if self.jacobians is None:
+            models = self.get_models()
+            self.jacobians = []
+
+            for idx, mod, like in zip(self.like_indices, models,
+                                      self.likelihoods):
+                if isinstance(like, GaussianLikelihood):
+                    self.jacobians.append(jax.jit(jax.jacfwd(mod)))
                 else:
                     # Doesn't necessarily exist.
                     self.jacobians.append(None)
@@ -190,7 +207,7 @@ class Pipeline:
         chain = [theta_start]
         theta = theta_start.copy()
 
-        for _ in tqdm(range(max_steps)):
+        for _ in range(max_steps):
             v, g = vgrad(theta)
             updates, state = optimizer.update(g, state, theta)
             theta = optax.apply_updates(theta, updates)
