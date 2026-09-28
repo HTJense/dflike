@@ -1,10 +1,9 @@
 import jax
 import jax.numpy as jnp
 from typing import Callable
-from .likelihood import Likelihood
 
 
-class Prior(Likelihood):
+class Prior:
     def __init__(self, priors: dict = {}):
         self.priors = []
         self.H_priors = []
@@ -18,12 +17,12 @@ class Prior(Likelihood):
         self.H_priors.append(jax.hessian(logprior))
         self.parameters.append(parameter)
 
-    def loglike(self, theta: jnp.ndarray, **kwargs) -> jnp.ndarray:
+    def logprior(self, theta: jnp.ndarray) -> jnp.ndarray:
         return jnp.sum(jnp.array([
             pi(th) for pi, th in zip(self.priors, theta)
         ]))
 
-    def fisher(self, theta: jnp.ndarray, **kwargs) -> jnp.ndarray:
+    def fisher(self, theta: jnp.ndarray) -> jnp.ndarray:
         res = jnp.zeros((len(self.parameters)))
 
         for i, pi2 in enumerate(self.H_priors):

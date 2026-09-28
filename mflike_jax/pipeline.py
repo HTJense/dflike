@@ -1,12 +1,15 @@
 import jax
 import jax.numpy as jnp
 import jax.scipy as jsc
+from typing import Callable, Optional
+import optax
 from .likelihood import Likelihood, GaussianLikelihood
+from .prior import Prior
 from .theory import Theory
 
 
 class Pipeline:
-    def __init__(self, components: list):
+    def __init__(self, components: list, prior: Optional[Prior] = None):
         self.components = components
         self.theories = [comp for comp in self.components
                          if isinstance(comp, Theory)]
@@ -18,7 +21,16 @@ class Pipeline:
         ))
         self.parameters = self.parameters_full.copy()
         self.theta_default = jnp.array([jnp.nan for _ in self.parameters_full])
-        self.idx_expand = jnp.array(range(len(self.parameters)))
+        self.free_to_full = jnp.array(range(len(self.parameters)))
+
+        self.prior = prior
+        self.prior_indices = jnp.array([])
+        self.prior_free_indices = jnp.array([])
+        if self.prior is not None:
+            self.prior_indices = jnp.array([
+                self.parameters_full.index(i) for i in self.prior.parameters
+            ])
+            self.prior_free_indices = self.prior_indices.copy()
 
         self.th_indices = [
             jnp.array([
@@ -35,6 +47,8 @@ class Pipeline:
             idx.copy() for idx in self.like_indices
         ]
 
+        self.jacobians = None
+
     def restrict(self, theta_fixed: dict):
         self.parameters = self.parameters_full.copy()
         for p in theta_fixed:
@@ -43,7 +57,7 @@ class Pipeline:
         self.theta_default = jnp.array([
             theta_fixed.get(p, jnp.nan) for p in self.parameters_full
         ])
-        self.idx_expand = jnp.array([
+        self.free_to_full = jnp.array([
             self.parameters_full.index(p) for p in self.parameters
         ])
         self.like_free_indices = [
@@ -54,13 +68,22 @@ class Pipeline:
             ])
             for like in self.likelihoods
         ]
+        if self.prior is not None:
+            self.prior_free_indices = jnp.array([
+                self.prior.parameters.index(p)
+                for p in self.prior.parameters
+                if p in self.parameters
+            ])
+
+        # Clear the Jacobians cache (they should be re-built).
+        self.jacobians = None
 
     def expand(self, theta_free: jnp.ndarray) -> jnp.ndarray:
         if theta_free.shape == self.theta_default.shape:
             # This vector has already been expanded, so don't do it again!
             return theta_free
 
-        return self.theta_default.at[self.idx_expand].set(theta_free)
+        return self.theta_default.at[self.free_to_full].set(theta_free)
 
     def compute(self, theta: jnp.ndarray) -> dict:
         theta_full = self.expand(theta)
@@ -82,37 +105,71 @@ class Pipeline:
 
         return products
 
-    def logposterior(self, theta: jnp.ndarray) -> float:
+    def logprior(self, theta: jnp.ndarray) -> float:
+        logpi = 0.0
+        if self.prior is not None:
+            theta_full = self.expand(theta)
+            logpi = self.prior.logprior(theta_full[self.prior_indices])
+
+        return logpi
+
+    def loglike(self, theta: jnp.ndarray) -> float:
         """
-            Compute all theories and yield the log-posterior.
+            Compute all theories and yield the log-likelihood.
         """
         theta_full = self.expand(theta)
-        products = self.compute(theta_full)
+        products = self.compute(theta)
 
-        logp = jnp.sum(jnp.array([
+        loglike = jnp.sum(jnp.array([
             like.loglike(theta_full[idx], **products)
             for idx, like in zip(self.like_indices, self.likelihoods)
         ]))
 
-        return logp
+        return loglike
+
+    def logposterior(self, theta: jnp.ndarray) -> float:
+        """
+            Alias for `logprior(theta) + loglike(theta)`.
+        """
+        return self.logprior(theta) + self.loglike(theta)
+
+    def get_jacobians(self) -> list[Callable]:
+        if self.jacobians is None:
+            self.jacobians = []
+
+            for idx, like in zip(self.like_indices, self.likelihoods):
+                if isinstance(like, GaussianLikelihood):
+                    def model(x):
+                        x_f = self.expand(x)
+                        products = self.compute(x_f)
+                        return like.get_model(x_f[idx], **products)
+
+                    self.jacobians.append(jax.jit(jax.jacfwd(model)))
+                else:
+                    # Doesn't necessarily exist.
+                    self.jacobians.append(None)
+
+        return self.jacobians
 
     def fisher(self, theta: jnp.ndarray) -> jnp.ndarray:
         F = jnp.zeros((theta.size, theta.size))
 
         theta_full = self.expand(theta)
         products = self.compute(theta_full)
+        jac = self.get_jacobians()
 
-        for idx, f_idx, like in zip(self.like_indices, self.like_free_indices,
-                                    self.likelihoods):
+        if self.prior is not None:
+            F_prior = self.prior.fisher(theta_full[self.prior_indices])
+            F = F.at[jnp.ix_(self.prior_free_indices,self.prior_free_indices)].add(
+                F_prior[jnp.ix_(self.prior_free_indices,self.prior_free_indices)]
+            )
+
+        for idx, J, f_idx, like in zip(self.like_indices, jac,
+                                       self.like_free_indices,
+                                       self.likelihoods):
             if isinstance(like, GaussianLikelihood):
-                def model(x):
-                    x_f = self.expand(x)
-                    products = self.compute(x_f)
-                    return like.get_model(x_f[idx], **products)
-
-                J = jax.jacfwd(model)(theta)
-                L = like.get_covariance_cholesky(theta, **products)
-                W = jsc.linalg.solve_triangular(L, J, lower=True)
+                L = like.get_covariance_cholesky(theta_full[idx], **products)
+                W = jsc.linalg.solve_triangular(L, J(theta), lower=True)
 
                 F = F + W.T @ W
             else:
@@ -122,3 +179,32 @@ class Pipeline:
                 )
 
         return F
+
+    def minimize(self, theta_start: jnp.ndarray, max_steps: int, **kwargs) -> list[jnp.ndarray]:
+        # Find the best-fitting log-posterior.
+        optimizer = optax.adam(**kwargs)
+        state = optimizer.init(theta_start)
+
+        vgrad = jax.jit(jax.value_and_grad(lambda theta: -self.logposterior(theta)))
+
+        chain = [theta_start]
+        theta = theta_start.copy()
+
+        for _ in tqdm(range(max_steps)):
+            v, g = vgrad(theta)
+            updates, state = optimizer.update(g, state, theta)
+            theta = optax.apply_updates(theta, updates)
+
+            if jnp.any(jnp.isnan(theta)):
+                print("Non-finite theta.")
+                break
+            if not jnp.isfinite(v):
+                print("Non-finite log-posterior.")
+                break
+            if jnp.any(jnp.isnan(g)):
+                print("Non-finite gradient.")
+                break
+
+            chain.append(theta)
+
+        return chain
