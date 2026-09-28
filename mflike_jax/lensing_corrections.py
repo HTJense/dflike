@@ -6,9 +6,10 @@ import jax
 import jax.numpy as jnp
 from cobaya.yaml import yaml_load_file
 from cobaya.tools import resolve_packages_path
+from .theory import Theory
 
 
-class LensingCorrections:
+class LensingCorrections(Theory):
     def __init__(self, config: str | dict):
         if type(config) is str:
             self.config = yaml_load_file(config)
@@ -67,8 +68,7 @@ class LensingCorrections:
         self.kk_factor = 2. * np.pi / 4.
         self.parameters = []
 
-    @partial(jax.jit, static_argnums=(0,))
-    def get_corrections(self, cls, theta=None):
+    def get_corrections(self, theta, *, cls):
         cls = {
             "tt": cls["tt"][self.ells] * self.dl_factor,
             "te": cls["te"][self.ells] * self.dl_factor,
@@ -82,3 +82,12 @@ class LensingCorrections:
             + sum([self.n1_response[s] @ delta[s] for s in self.n1_response])
 
         return 2. * (self.fiducial["kk"] / self.n0) * n0 + n1
+
+    def compute(self, theta, *, cls, **kwargs):
+        return {"corrections": self.get_corrections(theta, cls=cls)}
+
+    def inputs(self):
+        return ("cls",)
+
+    def outputs(self):
+        return ("corrections",)

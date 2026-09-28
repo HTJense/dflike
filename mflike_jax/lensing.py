@@ -6,9 +6,10 @@ import jax
 import jax.numpy as jnp
 from cobaya.yaml import yaml_load_file
 from cobaya.tools import resolve_packages_path
+from .likelihood import GaussianLikelihood
 
 
-class Lensing_jax:
+class Lensing_jax(GaussianLikelihood):
     def __init__(self, config: str | dict):
         if type(config) is str:
             self.config = yaml_load_file(config)
@@ -33,42 +34,25 @@ class Lensing_jax:
         self.ells = jnp.array(bpw.values)
         self.lmax = int(self.ells.max())
         self.binning_matrix = jnp.array(bpw.weight.T)
-        self.covmat = jnp.array(data.covariance.covmat[:, :])
-        self.inv_cov = jnp.linalg.inv(self.covmat)
+        self.covariance = jnp.array(data.covariance.covmat[:, :])
         self.logp_const = -0.5 * (
             np.log(2. * np.pi) * len(self.data_vec)
-            + np.linalg.slogdet(self.inv_cov)[1]
+            - np.linalg.slogdet(self.covariance)[1]
         )
 
-    @partial(jax.jit, static_argnums=(0,))
     def bin_spectra(self, dlkk):
         model_vec = self.binning_matrix @ dlkk
         return model_vec
 
-    @partial(jax.jit, static_argnums=(0,))
-    def get_unbinned_model(self, dlpp, corrections=None, theta=None):
-        dlkk = 2. * np.pi * dlpp[self.ells] / 4.
+    def get_unbinned_model(self, theta, *, cls, corrections=None):
+        dlkk = 2. * np.pi * cls["pp"][self.ells] / 4.
         if corrections is None:
             return dlkk
         return dlkk + corrections
 
-    @partial(jax.jit, static_argnums=(0,))
-    def get_model(self, dlpp, corrections=None, theta=None):
-        model = self.get_unbinned_model(dlpp, corrections, theta)
+    def get_model(self, theta, *, cls, corrections=None, **kwargs):
+        model = self.get_unbinned_model(theta, cls=cls, corrections=corrections)
         return self.bin_spectra(model)
-
-    @partial(jax.jit, static_argnums=(0,))
-    def chisquare(self, dlpp, corrections=None, theta=None):
-        model_vec = self.get_model(dlpp, corrections, theta)
-        delta = model_vec - self.data_vec
-        chi2 = delta @ self.inv_cov @ delta
-
-        return chi2
-
-    @partial(jax.jit, static_argnums=(0,))
-    def loglike(self, dlpp, corrections=None, theta=None):
-        chi2 = self.chisquare(dlpp, corrections, theta)
-        return -0.5 * chi2 + self.logp_const
 
 
 def get_cobaya_class():

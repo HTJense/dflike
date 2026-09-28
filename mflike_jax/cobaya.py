@@ -30,10 +30,10 @@ class MFLike_jax_cobaya(Likelihood):
     def logp(self, **params):
         cls = self.provider.get_Cl(ell_factor=True)
         theta_fg = np.array([params[k] for k in self.theory.parameters])
-        fg_model = self.theory.get_foreground_model(theta_fg)
+        foregrounds = self.theory.get_foreground_model(theta_fg)
         theta_like = np.array([params[k] for k in self.like.parameters])
-        chi2 = self.like.chisquare(cls, fg_model,
-                                   theta_like)
+        chi2 = self.like.chisquare(theta_like, cls=cls,
+                                   foregrounds=foregrounds)
 
         self.log.debug(f"Chi square = {chi2:.2f}")
 
@@ -79,10 +79,10 @@ class Lensing_jax_cobaya(Likelihood):
         corr = None
         if self.theory is not None:
             theta_th = np.array([params[k] for k in self.theory.parameters])
-            corr = self.theory.get_corrections(cls, theta_th)
+            corr = self.theory.get_corrections(theta_th, cls=cls)
 
         theta_like = np.array([params[k] for k in self.like.parameters])
-        chi2 = self.like.chisquare(cls, corr, theta_like)
+        chi2 = self.like.chisquare(theta_like, cls=cls, corrections=corr)
 
         self.log.debug(f"Chi square = {chi2:.2f}")
 

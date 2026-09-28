@@ -10,6 +10,20 @@ from .theory import Theory
 
 class Pipeline:
     def __init__(self, components: list, prior: Optional[Prior] = None):
+        used_components = []
+        for comp in components:
+            if isinstance(comp, Prior):
+                if prior is not None:
+                    raise ValueError("Prior present in component list and "
+                                     "passed on separately! Should be one or "
+                                     "the other.")
+                prior = comp
+            elif isinstance(comp, Likelihood) or isinstance(comp, Theory):
+                used_components.append(comp)
+            else:
+                raise ValueError("What am I to do with {comp}?")
+
+        components = used_components
         self.components = components
         self.theories = [comp for comp in self.components
                          if isinstance(comp, Theory)]
