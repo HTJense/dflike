@@ -132,6 +132,8 @@ class MultiFrequency(GaussianLikelihood):
         self.covariance = jnp.array(
             t.covariance.covmat[data_indices, :][:, data_indices]
         )
+        self.cov_L = jnp.linalg.cholesky(self.covariance)
+
         self.logp_const = -0.5 * (
             np.log(2. * np.pi) * len(self.data_vec)
             - np.linalg.slogdet(self.covariance)[1]
@@ -191,7 +193,10 @@ class MultiFrequency(GaussianLikelihood):
         model = self.get_unbinned_model(theta, cls, foregrounds)
         return self.bin_spectra(model)
 
-    def design_matrix(self, theta, n_ig=1):
+    def get_covariance_cholesky(self, theta, *, cls, foregrounds, **kwargs):
+        return self.cov_L
+
+    def design_matrix(self, theta, *, n_ig=1, **kwargs):
         nb = {}
         # Count the number of bins per extracted cross-spectrum.
         for m in self.spec_meta:
