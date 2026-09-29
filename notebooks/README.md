@@ -14,4 +14,24 @@ The notebook shows the general structure and functionality of likelihoods and th
 
 ## 2. Introduction to Differentiability
 
-This notebook shows how `jax` autodifferentiability works by constructing several functions
+This notebook shows how `jax` autodifferentiability works by constructing several functions that exploit differentiability. It shows how to modify functions to keep specific parameters fixed with minimal overhead.
+
+
+## 3. Cosmology
+
+This notebook utilizes the `cosmopower_jax` wrapper to include CMB cosmopower emulators to propagate derivatives to cosmology.
+
+
+## 4. Lensing
+
+This notebook shows how to use the Lensing likelihood and theory codes. It also shows how to do quick forecasting of errors for the CMB in combination with Lensing.
+
+
+## 5. Parameter Biases
+
+This notebook shows how to utilize Fisher forecasting functions to compute posterior approximations, and how to propagate model mismatches into parameter biases.
+
+
+## 6. Pipelines
+
+This notebook summarizes some of the things shown in previous notebooks, utilizing the builtin `Pipeline` structure to automate a lot of operations.
