@@ -35,7 +35,7 @@ class Pipeline:
         ))
         self.parameters = self.parameters_full.copy()
         self.theta_default = jnp.array([jnp.nan for _ in self.parameters_full])
-        self.free_to_full = jnp.array(range(len(self.parameters)))
+        self.free_to_full = jnp.array(range(len(self.parameters)), dtype=int)
 
         self.prior = prior
         self.prior_indices = jnp.array([])
@@ -43,19 +43,19 @@ class Pipeline:
         if self.prior is not None:
             self.prior_indices = jnp.array([
                 self.parameters_full.index(i) for i in self.prior.parameters
-            ])
+            ], dtype=int)
             self.prior_free_indices = self.prior_indices.copy()
 
         self.th_indices = [
             jnp.array([
                 self.parameters_full.index(i) for i in th.parameters
-            ]) for th in self.theories
+            ], dtype=int) for th in self.theories
         ]
 
         self.like_indices = [
             jnp.array([
                 self.parameters_full.index(p) for p in like.parameters
-            ]) for like in self.likelihoods
+            ], dtype=int) for like in self.likelihoods
         ]
         self.like_free_indices = [
             idx.copy() for idx in self.like_indices
@@ -74,13 +74,13 @@ class Pipeline:
         ])
         self.free_to_full = jnp.array([
             self.parameters_full.index(p) for p in self.parameters
-        ])
+        ], dtype=int)
         self.like_free_indices = [
             jnp.array([
                 like.parameters.index(p)
                 for p in like.parameters
                 if p in self.parameters
-            ])
+            ], dtype=int)
             for like in self.likelihoods
         ]
         if self.prior is not None:
@@ -88,7 +88,7 @@ class Pipeline:
                 self.prior.parameters.index(p)
                 for p in self.prior.parameters
                 if p in self.parameters
-            ])
+            ], dtype=int)
 
         # Clear the Jacobians cache (they should be re-built).
         self.jacobians = None
@@ -151,16 +151,18 @@ class Pipeline:
 
     def get_models(self) -> list[Callable]:
         if self.models is None:
+            def make_model(like, idx):
+                def model(x):
+                    x_f = self.expand(x)
+                    products = self.compute(x_f)
+                    return like.get_model(x_f[idx], **products)
+                return model
+
             self.models = []
 
             for idx, like in zip(self.like_indices, self.likelihoods):
                 if isinstance(like, GaussianLikelihood):
-                    def model(x):
-                        x_f = self.expand(x)
-                        products = self.compute(x_f)
-                        return like.get_model(x_f[idx], **products)
-
-                    self.models.append(jax.jit(model))
+                    self.models.append(jax.jit(make_model(like, idx)))
                 else:
                     # Doesn't necessarily exist.
                     self.models.append(None)
@@ -211,7 +213,7 @@ class Pipeline:
         return F
 
     def minimize(self, theta_start: jnp.ndarray, max_steps: int,
-                 **kwargs) -> list[jnp.ndarray]:
+                 tqdm = lambda x: x, **kwargs) -> list[jnp.ndarray]:
         # Find the best-fitting log-posterior.
         optimizer = optax.adam(**kwargs)
         state = optimizer.init(theta_start)
@@ -223,7 +225,7 @@ class Pipeline:
         chain = [theta_start]
         theta = theta_start.copy()
 
-        for _ in range(max_steps):
+        for _ in tqdm(range(max_steps)):
             v, g = vgrad(theta)
             updates, state = optimizer.update(g, state, theta)
             theta = optax.apply_updates(theta, updates)

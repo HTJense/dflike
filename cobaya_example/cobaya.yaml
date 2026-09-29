@@ -4,7 +4,7 @@ sampler:
   mcmc:
 
 likelihood:
-  mflike_jax:
+  dflike:
     stop_at_error: true
     like_config_file: ../act_dr6.yaml
     fg_config_file: ../act_dr6_foregrounds.yaml

@@ -1,15 +1,13 @@
 import numpy as np
 import sacc
 import os
-from functools import partial
-import jax
 import jax.numpy as jnp
 from cobaya.yaml import yaml_load_file
 from cobaya.tools import resolve_packages_path
 from .likelihood import GaussianLikelihood
 
 
-class Lensing_jax(GaussianLikelihood):
+class Lensing(GaussianLikelihood):
     def __init__(self, config: str | dict):
         if type(config) is str:
             self.config = yaml_load_file(config)
@@ -51,7 +49,8 @@ class Lensing_jax(GaussianLikelihood):
         return dlkk + corrections
 
     def get_model(self, theta, *, cls, corrections=None, **kwargs):
-        model = self.get_unbinned_model(theta, cls=cls, corrections=corrections)
+        model = self.get_unbinned_model(theta, cls=cls,
+                                        corrections=corrections)
         return self.bin_spectra(model)
 
 

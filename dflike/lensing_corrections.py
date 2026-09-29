@@ -1,8 +1,6 @@
 import numpy as np
 import sacc
 import os
-from functools import partial
-import jax
 import jax.numpy as jnp
 from cobaya.yaml import yaml_load_file
 from cobaya.tools import resolve_packages_path
@@ -86,8 +84,10 @@ class LensingCorrections(Theory):
     def compute(self, theta, *, cls, **kwargs):
         return {"corrections": self.get_corrections(theta, cls=cls)}
 
+    @property
     def inputs(self):
         return ("cls",)
 
+    @property
     def outputs(self):
         return ("corrections",)
