@@ -1,6 +1,6 @@
 # DFLike
 
-This is a collection of Differentiable Likelihoods for Simons Observatory.
+This is a collection of Differentiable Likelihoods and codes for Simons Observatory.
 
 It currently contains a JAX implementation of [LAT_MFLike](https://github.com/simonsobs/LAT_MFLike/) (and parts of [fgspectra](https://github.com/simonsobs/fgspectra) which it relies on), as well a simple Gaussian Lensing likelihood based on the one from [SOLikeT](https://github.com/simonsobs/SOLikeT).
 
