@@ -33,10 +33,14 @@ class Lensing(GaussianLikelihood):
         self.lmax = int(self.ells.max())
         self.binning_matrix = jnp.array(bpw.weight.T)
         self.covariance = jnp.array(data.covariance.covmat[:, :])
+        self.cov_L = jnp.linalg.cholesky(self.covariance)
         self.logp_const = -0.5 * (
             np.log(2. * np.pi) * len(self.data_vec)
             - np.linalg.slogdet(self.covariance)[1]
         )
+
+    def get_covariance_cholesky(self, theta, **kwargs):
+        return self.cov_L
 
     def bin_spectra(self, dlkk):
         model_vec = self.binning_matrix @ dlkk

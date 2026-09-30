@@ -2,6 +2,7 @@
     Cobaya wrappers for DFLike.
 """
 from . import cmb_like
+from . import moped
 from . import bandpower_foregrounds as fg
 from . import lensing, lensing_corrections
 from cobaya.likelihood import Likelihood
@@ -15,6 +16,37 @@ class MultiFrequency_cobaya(Likelihood):
 
     def initialize(self):
         self.like = cmb_like.MultiFrequency(self.like_config_file)
+        self.theory = fg.BandpowerForegrounds(self.fg_config_file, self.like)
+
+    def get_requirements(self):
+        reqs = {
+            "Cl": {k: self.like.lmax for k in self.like.requested_cls}
+        }
+
+        for par in self.like.parameters + self.theory.parameters:
+            reqs[par] = None
+
+        return reqs
+
+    def logp(self, **params):
+        cls = self.provider.get_Cl(ell_factor=True)
+        theta_fg = np.array([params[k] for k in self.theory.parameters])
+        foregrounds = self.theory.get_foreground_model(theta_fg)
+        theta_like = np.array([params[k] for k in self.like.parameters])
+        chi2 = self.like.chisquare(theta_like, cls=cls,
+                                   foregrounds=foregrounds)
+
+        self.log.debug(f"Chi square = {chi2:.2f}")
+
+        return float(-chi2 / 2.)
+
+
+class Moped_cobaya(Likelihood):
+    like_config_file: Optional[str | dict] = None
+    fg_config_file: Optional[str | dict] = None
+
+    def initialize(self):
+        self.like = moped.Moped(self.like_config_file)
         self.theory = fg.BandpowerForegrounds(self.fg_config_file, self.like)
 
     def get_requirements(self):
