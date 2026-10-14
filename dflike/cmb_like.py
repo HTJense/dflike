@@ -161,7 +161,7 @@ class MultiFrequency(GaussianLikelihood):
 
         res = []
         for i, xy in enumerate(self.requested_cls):
-            cal = calG
+            cal = calG * jnp.ones(spectra[i].shape)
             if xy[0] == "t":
                 cal *= calT[:, None]
             else:

@@ -11,6 +11,10 @@ class Moped(MultiFrequency):
         self.moped_B = jnp.array(np.loadtxt(self.config["moped_file"]))
         self.covariance = jnp.eye(self.moped_B.shape[1])
 
+    def get_whitened_residual(self, theta, **kwargs):
+        mu = self.get_model(theta, **kwargs)
+        return self.moped_B.T @ self.data_vec - mu
+
     def get_model(self, theta, **kwargs):
         model = super().get_model(theta, **kwargs)
         return self.moped_B.T @ model
