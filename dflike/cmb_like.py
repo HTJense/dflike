@@ -368,11 +368,10 @@ class CMBNull(MultiFrequency):
     def marginal(self, theta, **kwargs):
         m = self.get_model(theta, **kwargs)
         r = self.data_vec - m
-        L = self.get_covariance_cholesky(theta, **kwargs)
         # Manual whitening to add the covmat offset term.
-        y = jsc.linalg.solve_triangular(L, r, lower=True)
+        y = jsc.linalg.solve_triangular(self.L_sigma_inv, r, lower=True)
         M = self.design_matrix(theta, **kwargs)
-        A = jsc.linalg.solve_triangular(L, M, lower=True)
+        A = jsc.linalg.solve_triangular(self.L_sigma_inv, M, lower=True)
         Q, R = jnp.linalg.qr(A, mode="reduced")
         yp = y - Q @ (Q.T @ y)
         chi2 = jnp.sum(yp ** 2.)

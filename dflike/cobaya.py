@@ -72,6 +72,28 @@ class Moped_cobaya(Likelihood):
         return float(-chi2 / 2.)
 
 
+class Null_cobaya(Likelihood):
+    like_config_file: Optional[str | dict] = None
+    fg_config_file: Optional[str | dict] = None
+
+    def initialize(self):
+        self.like = cmb_like.CMBNull(self.like_config_file)
+        self.theory = fg.BandpowerForegrounds(self.fg_config_file, self.like)
+
+    def get_requirements(self):
+        return {p: None for p in self.like.parameters + self.theory.parameters}
+
+    def logp(self, **params):
+        theta_fg = np.array([params[k] for k in self.theory.parameters])
+        foregrounds = self.theory.get_foreground_model(theta_fg)
+        theta_like = np.array([params[k] for k in self.like.parameters])
+        chi2 = self.like.chisquare(theta_like, foregrounds=foregrounds)
+
+        self.log.debug(f"Chi square = {chi2:.2f}")
+
+        return float(-chi2 / 2.)
+
+
 class Lensing_cobaya(Likelihood):
     config_file: str | dict
     corr_config_file: Optional[str | dict] = None
